@@ -61,7 +61,7 @@ export default function LoginPage() {
   const [sucesso, setSucesso] = useState('')
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string) => {
       if (event === 'PASSWORD_RECOVERY') {
         setModo('nova_senha')
       }
