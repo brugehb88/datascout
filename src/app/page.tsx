@@ -6,7 +6,7 @@ import MainLayout from '@/components/layout/mainlayout'
 import ListaJogos from '@/components/dashboard/ListaJogos'
 import PainelJogo from '@/components/dashboard/PainelJogo'
 import { Jogo } from '@/types'
-
+export const dynamic = 'force-dynamic'
 export default function Home() {
   const [jogoSelecionado, setJogoSelecionado] = useState<Jogo | null>(null)
 
@@ -23,8 +23,7 @@ export default function Home() {
   return (
     <MainLayout>
       {/* Desktop: lado a lado | Mobile: empilhado */}
-      <div className="flex flex-col md:flex-row gap-6 pt-2 md:pt-0
-">
+      <div className="flex flex-col md:flex-row gap-6 pt-2 md:pt-0 min-w-0">
 
         {/* Lista de jogos */}
         <div className="w-full md:w-80 md:flex-shrink-0">

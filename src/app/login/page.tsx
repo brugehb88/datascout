@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { signIn, signUp } from '@/lib/auth'
 import { Eye, EyeOff } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-
+export const dynamic = 'force-dynamic'
 function Logo() {
   return (
     <div className="flex flex-col leading-none items-center">
