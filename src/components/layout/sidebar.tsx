@@ -1,22 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Calendar, Search, Trophy, Settings, LogOut, Menu, X } from 'lucide-react'
+import { Calendar, Search, Trophy, Settings, LogOut, Menu, X, Check } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-
-const ligas = [
-  { id: 1, nome: 'Brasileirão Série A', sigla: 'BSA' },
-  { id: 2, nome: 'Brasileirão Série B', sigla: 'BSB' },
-  { id: 3, nome: 'Copa do Brasil', sigla: 'CDB' },
-  { id: 4, nome: 'Libertadores', sigla: 'LIB' },
-  { id: 5, nome: 'Sul-Americana', sigla: 'SUL' },
-  { id: 6, nome: 'Premier League', sigla: 'PRL' },
-  { id: 7, nome: 'La Liga', sigla: 'LAL' },
-  { id: 8, nome: 'Serie A Italiana', sigla: 'ITA' },
-  { id: 9, nome: 'Ligue 1', sigla: 'FRA' },
-  { id: 10, nome: 'Europa League', sigla: 'UEL' },
-  { id: 11, nome: 'Copa do Mundo', sigla: 'WC', emBreve: true },
-]
+import { useFiltros } from '@/store/filtros'
 
 function Logo() {
   return (
@@ -30,12 +17,20 @@ function Logo() {
 }
 
 function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
-  const [busca, setBusca] = useState('')
-  const [filtroAtivo, setFiltroAtivo] = useState('hoje')
+  const {
+    busca,
+    setBusca,
+    ligasDisponiveis,
+    ligasSelecionadas,
+    toggleLiga,
+    selecionarTodasLigas,
+  } = useFiltros()
 
+  const ligas = ligasDisponiveis()
   const ligasFiltradas = ligas.filter(l =>
-    l.nome.toLowerCase().includes(busca.toLowerCase())
+    l.toLowerCase().includes(busca.toLowerCase())
   )
+  const todasSelecionadas = ligasSelecionadas.size === 0
 
   return (
     <div className="flex flex-col h-full">
@@ -63,58 +58,52 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
         </div>
       </div>
 
-      {/* Filtro de data */}
-      <div className="p-4 border-b border-gray-800">
-        <div className="flex items-center gap-1 mb-3">
-          <Calendar size={13} className="text-gray-500" />
-          <span className="text-gray-500 text-xs uppercase tracking-wider font-medium">Período</span>
-        </div>
-        <div className="flex flex-col gap-1">
-          {['hoje', 'amanhã', 'semana'].map((filtro) => (
-            <button
-              key={filtro}
-              onClick={() => setFiltroAtivo(filtro)}
-              className={`text-left text-sm px-3 py-2 rounded-lg capitalize transition-colors ${
-                filtroAtivo === filtro
-                  ? 'bg-emerald-500/10 text-emerald-400 font-medium'
-                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900'
-              }`}
-            >
-              {filtro}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Ligas */}
+      {/* Ligas dinâmicas */}
       <div className="p-4 flex-1 overflow-y-auto">
-        <div className="flex items-center gap-1 mb-3">
-          <Trophy size={13} className="text-gray-500" />
-          <span className="text-gray-500 text-xs uppercase tracking-wider font-medium">Ligas</span>
-        </div>
-        <div className="flex flex-col gap-1">
-          {ligasFiltradas.map((liga) => (
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-1">
+            <Trophy size={13} className="text-gray-500" />
+            <span className="text-gray-500 text-xs uppercase tracking-wider font-medium">Ligas</span>
+          </div>
+          {!todasSelecionadas && (
             <button
-              key={liga.id}
-              disabled={liga.emBreve}
-              className={`flex items-center gap-3 text-left text-sm px-3 py-2 rounded-lg transition-colors ${
-                liga.emBreve
-                  ? 'opacity-40 cursor-not-allowed'
-                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900'
-              }`}
+              onClick={selecionarTodasLigas}
+              className="text-emerald-400 text-xs hover:text-emerald-300 transition-colors"
             >
-              <span className="text-xs font-mono bg-gray-800 text-gray-500 px-1.5 py-0.5 rounded flex-shrink-0">
-                {liga.sigla}
-              </span>
-              <span className="truncate">{liga.nome}</span>
-              {liga.emBreve && (
-                <span className="ml-auto text-xs text-gray-600 bg-gray-800 px-1.5 py-0.5 rounded flex-shrink-0">
-                  em breve
-                </span>
-              )}
+              Ver todas
             </button>
-          ))}
+          )}
         </div>
+
+        {ligas.length === 0 ? (
+          <p className="text-gray-600 text-sm py-4 text-center">Carregando ligas...</p>
+        ) : (
+          <div className="flex flex-col gap-1">
+            {ligasFiltradas.map((liga) => {
+              const ativa = todasSelecionadas || ligasSelecionadas.has(liga)
+              return (
+                <button
+                  key={liga}
+                  onClick={() => toggleLiga(liga)}
+                  className={`flex items-center gap-3 text-left text-sm px-3 py-2 rounded-lg transition-colors ${
+                    ativa
+                      ? 'text-gray-200 hover:bg-gray-900'
+                      : 'text-gray-600 hover:text-gray-400 hover:bg-gray-900'
+                  }`}
+                >
+                  <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${
+                    ativa
+                      ? 'bg-emerald-500/20 border-emerald-500/50'
+                      : 'border-gray-700 bg-transparent'
+                  }`}>
+                    {ativa && <Check size={10} className="text-emerald-400" />}
+                  </div>
+                  <span className="truncate">{liga}</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* Footer */}
@@ -130,15 +119,15 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
             <button className="text-gray-600 hover:text-gray-400 transition-colors">
               <Settings size={15} />
             </button>
-            <button 
-  onClick={async () => {
-    await supabase.auth.signOut()
-    window.location.href = '/login'
-  }}
-  className="text-gray-600 hover:text-gray-400 transition-colors"
->
-  <LogOut size={15} />
-</button>
+            <button
+              onClick={async () => {
+                await supabase.auth.signOut()
+                window.location.href = '/login'
+              }}
+              className="text-gray-600 hover:text-gray-400 transition-colors"
+            >
+              <LogOut size={15} />
+            </button>
           </div>
         </div>
       </div>
@@ -157,15 +146,15 @@ export default function Sidebar() {
       </aside>
 
       {/* Mobile — barra topo */}
-<header className="md:hidden fixed top-0 left-0 right-0 z-30 bg-gray-950 border-b border-gray-800 px-5 py-3 flex items-center justify-between">
-  <Logo />
-  <button
-    onClick={() => setMobileAberto(true)}
-    className="text-gray-400 hover:text-white transition-colors p-1"
-  >
-    <Menu size={22} />
-  </button>
-</header>
+      <header className="md:hidden fixed top-0 left-0 right-0 z-30 bg-gray-950 border-b border-gray-800 px-5 py-3 flex items-center justify-between">
+        <Logo />
+        <button
+          onClick={() => setMobileAberto(true)}
+          className="text-gray-400 hover:text-white transition-colors p-1"
+        >
+          <Menu size={22} />
+        </button>
+      </header>
 
       {/* Mobile — overlay */}
       {mobileAberto && (

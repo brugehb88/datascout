@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Clock, ChevronRight, Zap, Loader2 } from 'lucide-react'
 import { Jogo } from '@/types'
 import { buscarJogosDodia } from '@/lib/api'
+import { useFiltros } from '@/store/filtros'
 
 interface Props {
   onSelecionarJogo: (jogo: Jogo) => void
@@ -11,54 +12,66 @@ interface Props {
 }
 
 export default function ListaJogos({ onSelecionarJogo, jogoSelecionado }: Props) {
-  const [jogos, setJogos] = useState<Jogo[]>([])
-  const [carregando, setCarregando] = useState(true)
-  const [erro, setErro] = useState('')
+  const {
+    jogos,
+    setJogos,
+    jogosFiltrados,
+    periodo,
+    setPeriodo,
+  } = useFiltros()
+
+  const filtrados = jogosFiltrados()
+  const carregando = jogos.length === 0 && periodo === 'hoje'
 
   useEffect(() => {
     async function carregar() {
-      setCarregando(true)
       try {
         const dados = await buscarJogosDodia()
         setJogos(dados)
       } catch {
-        setErro('Não foi possível carregar os jogos.')
-      } finally {
-        setCarregando(false)
+        console.error('Não foi possível carregar os jogos.')
       }
     }
     carregar()
-  }, [])
+  }, [periodo, setJogos])
 
-  if (carregando) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 gap-3">
-        <Loader2 size={22} className="text-emerald-400 animate-spin" />
-        <p className="text-gray-500 text-sm">Carregando jogos...</p>
-      </div>
-    )
-  }
-
-  if (erro) {
-    return (
-      <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
-        <p className="text-red-400 text-sm">{erro}</p>
-      </div>
-    )
-  }
-
-  if (jogos.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20">
-        <p className="text-gray-600 text-sm">Nenhum jogo encontrado para hoje.</p>
-      </div>
-    )
-  }
-
-  const ligasUnicas = [...new Set(jogos.map(j => j.liga))]
+  const ligasUnicas = [...new Set(filtrados.map(j => j.liga))]
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
+      {/* Filtro de período */}
+      <div className="flex gap-2">
+        {(['hoje', 'amanha', 'semana'] as const).map((p) => (
+          <button
+            key={p}
+            onClick={() => setPeriodo(p)}
+            className={`text-sm px-4 py-2 rounded-xl capitalize transition-colors ${
+              periodo === p
+                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-medium'
+                : 'bg-gray-900/50 text-gray-400 border border-gray-800 hover:text-gray-200 hover:border-gray-700'
+            }`}
+          >
+            {p === 'amanha' ? 'amanhã' : p}
+          </button>
+        ))}
+      </div>
+
+      {/* Loading */}
+      {carregando && jogos.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <Loader2 size={22} className="text-emerald-400 animate-spin" />
+          <p className="text-gray-500 text-sm">Carregando jogos...</p>
+        </div>
+      )}
+
+      {/* Sem resultados */}
+      {!carregando && filtrados.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-20">
+          <p className="text-gray-600 text-sm">Nenhum jogo encontrado para os filtros selecionados.</p>
+        </div>
+      )}
+
+      {/* Lista agrupada por liga */}
       {ligasUnicas.map(liga => (
         <div key={liga}>
           <div className="flex items-center gap-2 mb-2 px-1">
@@ -66,7 +79,7 @@ export default function ListaJogos({ onSelecionarJogo, jogoSelecionado }: Props)
             <div className="flex-1 h-px bg-gray-800" />
           </div>
           <div className="flex flex-col gap-1">
-            {jogos.filter(j => j.liga === liga).map(jogo => (
+            {filtrados.filter(j => j.liga === liga).map(jogo => (
               <button
                 key={jogo.id}
                 onClick={() => onSelecionarJogo(jogo)}

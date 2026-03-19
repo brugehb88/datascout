@@ -14,7 +14,6 @@ export default function Home() {
 
   function handleSelecionarJogo(jogo: Jogo) {
     setJogoSelecionado(jogo)
-    // No mobile, abre overlay
     if (window.innerWidth < 768) {
       setPainelMobileAberto(true)
     }
@@ -31,8 +30,7 @@ export default function Home() {
         {/* Lista de jogos */}
         <div className="w-full md:w-80 md:flex-shrink-0">
           <div className="mb-4">
-            <h1 className="text-white font-bold text-xl">Jogos de hoje</h1>
-            <p className="text-gray-500 text-sm mt-0.5">Quinta-feira, 12 de março</p>
+            <h1 className="text-white font-bold text-xl">Jogos</h1>
           </div>
           <ListaJogos
             onSelecionarJogo={handleSelecionarJogo}
@@ -72,7 +70,6 @@ export default function Home() {
               transition={{ type: 'spring', damping: 28, stiffness: 280 }}
               className="md:hidden fixed inset-0 top-0 bg-gray-950 z-50 flex flex-col overflow-hidden"
             >
-              {/* Header com botão voltar */}
               <div className="flex items-center gap-3 px-4 py-4 border-b border-gray-800 flex-shrink-0">
                 <button
                   onClick={handleFecharPainelMobile}
@@ -88,7 +85,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Conteúdo scrollável */}
               <div className="flex-1 overflow-y-auto px-4 py-4">
                 <PainelJogo jogo={jogoSelecionado} />
               </div>
