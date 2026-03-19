@@ -24,8 +24,7 @@ const planos = [
     features: [
       { icone: Sparkles, texto: '30 análises pré-jogo por mês' },
       { icone: Globe, texto: '10 ligas principais (BR + Europa top 5)' },
-      { icone: Shield, texto: 'Veredito com IA por mercado' },
-    ],
+      { icone: Shield, texto: 'Veredito estatístico potencializado por IA' },    ],
     ligas: [
       'Brasileirão Série A', 'Brasileirão Série B', 'Copa do Brasil',
       'Libertadores', 'Sul-Americana',
