@@ -12,7 +12,6 @@ function getSupabase() {
   return _supabase
 }
 
-// Proxy que cria o client só quando realmente acessado
 export const supabase = new Proxy({} as ReturnType<typeof createBrowserClient>, {
   get(_, prop) {
     return (getSupabase() as any)[prop]
