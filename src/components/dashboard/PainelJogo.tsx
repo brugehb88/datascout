@@ -202,7 +202,7 @@ export default function PainelJogo({ jogo }: Props) {
         return
       }
 
-      // 2. Chama o n8n (URL será configurada depois)
+      // 2. Chama o n8n
       const response = await fetch(`${process.env.NEXT_PUBLIC_N8N_URL}/analise`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -222,6 +222,21 @@ export default function PainelJogo({ jogo }: Props) {
 
       // 3. Salva no cache
       await salvarCache(analiseFormatada)
+
+      // 4. Incrementa contador de análises
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await supabase.rpc('incrementar_analise', { uid: user.id })
+        await supabase.from('analysis_log').insert({
+          user_id: user.id,
+          fixture_id: jogo.id,
+          league: jogo.liga,
+          home_team: jogo.time_casa,
+          away_team: jogo.time_fora,
+          plan_at_time: 'trial',
+        })
+      }
+
       setAnalise(analiseFormatada)
 
     } catch (err) {
@@ -273,7 +288,6 @@ export default function PainelJogo({ jogo }: Props) {
           </div>
         </div>
 
-        {/* Timestamp da análise */}
         {analise?.gerada_em && (
           <div className="mt-3 pt-3 border-t border-gray-800">
             <p className="text-gray-600 text-xs">
@@ -304,6 +318,7 @@ export default function PainelJogo({ jogo }: Props) {
             <Sparkles size={16} />
             Gerar análise
           </button>
+          <p className="text-gray-600 text-xs mt-3">Consome 1 crédito de análise</p>
         </motion.div>
       )}
 
@@ -323,7 +338,7 @@ export default function PainelJogo({ jogo }: Props) {
             </motion.div>
           </div>
           <h3 className="text-white font-semibold text-base mb-1">Analisando confronto...</h3>
-          <p className="text-gray-500 text-sm">Buscando dados e gerando Veredito</p>
+          <p className="text-gray-500 text-sm">Buscando dados e gerando veredito</p>
         </motion.div>
       )}
 

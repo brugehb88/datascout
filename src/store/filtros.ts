@@ -6,11 +6,9 @@ interface FiltrosState {
   jogos: Jogo[]
   setJogos: (jogos: Jogo[]) => void
 
-  // Filtro de ligas (toggle múltiplo)
-  ligasSelecionadas: Set<string>
-  toggleLiga: (liga: string) => void
-  selecionarTodasLigas: () => void
-  limparLigas: () => void
+  // Liga selecionada (null = todas)
+  ligaSelecionada: string | null
+  setLiga: (liga: string | null) => void
 
   // Busca por nome
   busca: string
@@ -31,15 +29,8 @@ export const useFiltros = create<FiltrosState>((set, get) => ({
   jogos: [],
   setJogos: (jogos) => set({ jogos }),
 
-  ligasSelecionadas: new Set<string>(),
-  toggleLiga: (liga) => set((state) => {
-    const novas = new Set(state.ligasSelecionadas)
-    if (novas.has(liga)) novas.delete(liga)
-    else novas.add(liga)
-    return { ligasSelecionadas: novas }
-  }),
-  selecionarTodasLigas: () => set({ ligasSelecionadas: new Set<string>() }),
-  limparLigas: () => set({ ligasSelecionadas: new Set<string>() }),
+  ligaSelecionada: null,
+  setLiga: (liga) => set({ ligaSelecionada: liga }),
 
   busca: '',
   setBusca: (busca) => set({ busca }),
@@ -53,11 +44,11 @@ export const useFiltros = create<FiltrosState>((set, get) => ({
   },
 
   jogosFiltrados: () => {
-    const { jogos, ligasSelecionadas, busca } = get()
+    const { jogos, ligaSelecionada, busca } = get()
 
     return jogos.filter(jogo => {
-      // Filtro de liga (set vazio = todas)
-      if (ligasSelecionadas.size > 0 && !ligasSelecionadas.has(jogo.liga)) {
+      // Filtro de liga
+      if (ligaSelecionada && jogo.liga !== ligaSelecionada) {
         return false
       }
 

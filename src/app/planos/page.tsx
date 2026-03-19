@@ -129,7 +129,7 @@ export default function PlanosPage() {
           <p className="text-gray-500 text-sm">
             {sub?.status === 'trialing'
               ? 'Selecione o plano que será ativado ao final do seu trial.'
-              : 'Assine para acessar análises completas com veredito de IA.'}
+              : 'Assine para acessar análises completas.'}
           </p>
         </div>
 

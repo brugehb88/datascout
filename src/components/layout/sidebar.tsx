@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Search, Trophy, Settings, LogOut, Menu, X, Check, Lock, Home } from 'lucide-react'
+import { Search, Trophy, LogOut, Menu, X, Lock, Home } from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useFiltros } from '@/store/filtros'
@@ -19,6 +19,35 @@ function Logo() {
   )
 }
 
+function CreditosBar() {
+  const { sub } = useSubscription()
+  if (!sub) return null
+
+  const restantes = Math.max(0, sub.analyses_limit - sub.analyses_used)
+  const percent = Math.round((sub.analyses_used / sub.analyses_limit) * 100)
+
+  return (
+    <div className="px-4 pb-2">
+      <div className="bg-gray-900/80 border border-gray-800 rounded-xl px-3 py-2.5">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-gray-500 text-xs">Análises restantes</span>
+          <span className={`text-xs font-semibold ${restantes <= 1 ? 'text-red-400' : restantes <= 3 ? 'text-amber-400' : 'text-emerald-400'}`}>
+            {restantes} de {sub.analyses_limit}
+          </span>
+        </div>
+        <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all ${
+              percent >= 90 ? 'bg-red-500' : percent >= 70 ? 'bg-amber-500' : 'bg-emerald-500'
+            }`}
+            style={{ width: `${Math.min(percent, 100)}%` }}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -27,19 +56,16 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
     busca,
     setBusca,
     ligasDisponiveis,
-    ligasSelecionadas,
-    toggleLiga,
-    selecionarTodasLigas,
+    ligaSelecionada,
+    setLiga,
     jogos,
   } = useFiltros()
 
-  // Se tem jogos carregados, usa ligas dinâmicas. Senão, usa config.
   const ligasDinamicas = ligasDisponiveis()
   const ligas = ligasDinamicas.length > 0 ? ligasDinamicas : LIGAS_PRO
   const ligasFiltradas = ligas.filter(l =>
     l.toLowerCase().includes(busca.toLowerCase())
   )
-  const todasSelecionadas = ligasSelecionadas.size === 0
   const naHome = pathname === '/'
 
   function handleClickLiga(liga: string) {
@@ -49,18 +75,27 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
       if (onFechar) onFechar()
       return
     }
-    // Se não tá na home, vai pra home primeiro
+
+    if (ligaSelecionada === liga) {
+      setLiga(null)
+    } else {
+      setLiga(liga)
+    }
+
     if (!naHome) {
       router.push('/')
-      if (onFechar) onFechar()
-      return
     }
-    toggleLiga(liga)
+    if (onFechar) onFechar()
   }
 
   function handleHome() {
+    setLiga(null)
     router.push('/')
     if (onFechar) onFechar()
+  }
+
+  function contarJogos(liga: string): number {
+    return jogos.filter(j => j.liga === liga).length
   }
 
   return (
@@ -82,13 +117,13 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
         <button
           onClick={handleHome}
           className={`w-full flex items-center gap-3 text-left text-sm px-3 py-2.5 rounded-lg transition-colors ${
-            naHome
+            naHome && !ligaSelecionada
               ? 'bg-emerald-500/10 text-emerald-400 font-medium'
               : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900'
           }`}
         >
           <Home size={15} />
-          <span>Jogos</span>
+          <span>Todos os jogos</span>
         </button>
       </div>
 
@@ -106,62 +141,52 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
         </div>
       </div>
 
-      {/* Ligas */}
+      {/* Ligas como navegação */}
       <div className="p-4 flex-1 overflow-y-auto">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-1">
-            <Trophy size={13} className="text-gray-500" />
-            <span className="text-gray-500 text-xs uppercase tracking-wider font-medium">Ligas</span>
-          </div>
-          {!todasSelecionadas && (
-            <button
-              onClick={selecionarTodasLigas}
-              className="text-emerald-400 text-xs hover:text-emerald-300 transition-colors"
-            >
-              Ver todas
-            </button>
-          )}
+        <div className="flex items-center gap-1 mb-3">
+          <Trophy size={13} className="text-gray-500" />
+          <span className="text-gray-500 text-xs uppercase tracking-wider font-medium">Ligas</span>
         </div>
 
         <div className="flex flex-col gap-1">
           {ligasFiltradas.map((liga) => {
             const permitida = ligaPermitida(liga, planoEfetivo)
-            const ativa = permitida && (todasSelecionadas || ligasSelecionadas.has(liga))
+            const ativa = ligaSelecionada === liga
+            const qtd = contarJogos(liga)
 
             return (
               <button
                 key={liga}
                 onClick={() => handleClickLiga(liga)}
-                className={`flex items-center gap-3 text-left text-sm px-3 py-2 rounded-lg transition-colors ${
-                  permitida
-                    ? ativa
-                      ? 'text-gray-200 hover:bg-gray-900'
-                      : 'text-gray-600 hover:text-gray-400 hover:bg-gray-900'
-                    : 'text-gray-700 hover:bg-gray-900/50 cursor-pointer'
+                className={`flex items-center gap-3 text-left text-sm px-3 py-2.5 rounded-lg transition-colors ${
+                  ativa
+                    ? 'bg-emerald-500/10 text-emerald-400 font-medium'
+                    : permitida
+                      ? 'text-gray-400 hover:text-gray-200 hover:bg-gray-900'
+                      : 'text-gray-700 hover:bg-gray-900/50 cursor-pointer'
                 }`}
               >
-                {permitida ? (
-                  <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${
-                    ativa
-                      ? 'bg-emerald-500/20 border-emerald-500/50'
-                      : 'border-gray-700 bg-transparent'
-                  }`}>
-                    {ativa && <Check size={10} className="text-emerald-400" />}
-                  </div>
-                ) : (
+                {!permitida && (
                   <Lock size={12} className="text-gray-700 flex-shrink-0" />
                 )}
                 <span className="truncate flex-1">{liga}</span>
-                {!permitida && (
+                {!permitida ? (
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium flex-shrink-0">
                     PRO
                   </span>
-                )}
+                ) : qtd > 0 ? (
+                  <span className={`text-xs flex-shrink-0 ${ativa ? 'text-emerald-400' : 'text-gray-600'}`}>
+                    {qtd}
+                  </span>
+                ) : null}
               </button>
             )
           })}
         </div>
       </div>
+
+      {/* Créditos */}
+      <CreditosBar />
 
       {/* Footer */}
       <div className="p-4 border-t border-gray-800">
@@ -172,17 +197,15 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
             </div>
             <span className="text-gray-400 text-sm">Minha conta</span>
           </a>
-          <div className="flex gap-2">
-            <button
-              onClick={async () => {
-                await supabase.auth.signOut()
-                window.location.href = '/login'
-              }}
-              className="text-gray-600 hover:text-gray-400 transition-colors"
-            >
-              <LogOut size={15} />
-            </button>
-          </div>
+          <button
+            onClick={async () => {
+              await supabase.auth.signOut()
+              window.location.href = '/login'
+            }}
+            className="text-gray-600 hover:text-gray-400 transition-colors"
+          >
+            <LogOut size={15} />
+          </button>
         </div>
       </div>
     </div>

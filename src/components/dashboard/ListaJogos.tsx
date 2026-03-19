@@ -18,10 +18,10 @@ export default function ListaJogos({ onSelecionarJogo, jogoSelecionado }: Props)
     jogosFiltrados,
     periodo,
     setPeriodo,
+    ligaSelecionada,
   } = useFiltros()
 
   const filtrados = jogosFiltrados()
-  const carregando = jogos.length === 0 && periodo === 'hoje'
 
   useEffect(() => {
     async function carregar() {
@@ -35,6 +35,7 @@ export default function ListaJogos({ onSelecionarJogo, jogoSelecionado }: Props)
     carregar()
   }, [periodo, setJogos])
 
+  const carregando = jogos.length === 0
   const ligasUnicas = [...new Set(filtrados.map(j => j.liga))]
 
   return (
@@ -56,8 +57,15 @@ export default function ListaJogos({ onSelecionarJogo, jogoSelecionado }: Props)
         ))}
       </div>
 
+      {/* Título contextual */}
+      {ligaSelecionada && (
+        <p className="text-gray-500 text-xs uppercase tracking-wider font-medium">
+          {ligaSelecionada} — {filtrados.length} {filtrados.length === 1 ? 'jogo' : 'jogos'}
+        </p>
+      )}
+
       {/* Loading */}
-      {carregando && jogos.length === 0 && (
+      {carregando && (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
           <Loader2 size={22} className="text-emerald-400 animate-spin" />
           <p className="text-gray-500 text-sm">Carregando jogos...</p>
@@ -67,17 +75,25 @@ export default function ListaJogos({ onSelecionarJogo, jogoSelecionado }: Props)
       {/* Sem resultados */}
       {!carregando && filtrados.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20">
-          <p className="text-gray-600 text-sm">Nenhum jogo encontrado para os filtros selecionados.</p>
+          <p className="text-gray-600 text-sm">
+            {ligaSelecionada
+              ? `Nenhum jogo encontrado para ${ligaSelecionada}.`
+              : 'Nenhum jogo encontrado para os filtros selecionados.'}
+          </p>
         </div>
       )}
 
       {/* Lista agrupada por liga */}
       {ligasUnicas.map(liga => (
         <div key={liga}>
-          <div className="flex items-center gap-2 mb-2 px-1">
-            <span className="text-gray-500 text-xs uppercase tracking-wider font-medium">{liga}</span>
-            <div className="flex-1 h-px bg-gray-800" />
-          </div>
+          {/* Só mostra header da liga se não tem liga selecionada */}
+          {!ligaSelecionada && (
+            <div className="flex items-center gap-2 mb-2 px-1">
+              <span className="text-gray-500 text-xs uppercase tracking-wider font-medium">{liga}</span>
+              <div className="flex-1 h-px bg-gray-800" />
+              <span className="text-gray-700 text-xs">{filtrados.filter(j => j.liga === liga).length}</span>
+            </div>
+          )}
           <div className="flex flex-col gap-1">
             {filtrados.filter(j => j.liga === liga).map(jogo => (
               <button
