@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Crown, Zap, Calendar, BarChart2, LogOut } from 'lucide-react'
+import { Crown, Zap, Calendar, BarChart2, LogOut, ChevronRight, User, CreditCard } from 'lucide-react'
+import MainLayout from '@/components/layout/mainlayout'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -27,6 +28,7 @@ export default function PerfilPage() {
   const { user, loading: authLoading } = useAuth()
   const [sub, setSub] = useState<Subscription | null>(null)
   const [loading, setLoading] = useState(true)
+  const [secao, setSecao] = useState<'menu' | 'assinatura'>('menu')
 
   useEffect(() => {
     async function carregar() {
@@ -45,9 +47,11 @@ export default function PerfilPage() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <p className="text-gray-500 text-sm">Carregando...</p>
-      </div>
+      <MainLayout>
+        <div className="flex items-center justify-center py-20">
+          <p className="text-gray-500 text-sm">Carregando...</p>
+        </div>
+      </MainLayout>
     )
   }
 
@@ -64,25 +68,117 @@ export default function PerfilPage() {
   const trialAtivo = sub?.status === 'trialing' && diasRestantes > 0
   const percentUso = sub ? Math.round((sub.analyses_used / sub.analyses_limit) * 100) : 0
 
-  return (
-    <div className="min-h-screen bg-gray-950">
-      {/* Header */}
-      <div className="border-b border-gray-800 px-4 md:px-6 py-4">
-        <div className="max-w-2xl mx-auto flex items-center gap-3">
+  // Seção: Assinatura
+  if (secao === 'assinatura') {
+    return (
+      <MainLayout>
+        <div className="max-w-2xl pt-2 md:pt-0">
+          {/* Voltar */}
           <button
-            onClick={() => router.push('/')}
-            className="text-gray-400 hover:text-white transition-colors p-1"
+            onClick={() => setSecao('menu')}
+            className="text-gray-500 text-sm hover:text-gray-300 transition-colors mb-4"
           >
-            <ArrowLeft size={20} />
+            ← Voltar ao perfil
           </button>
-          <h1 className="text-white font-bold text-lg">Minha conta</h1>
-        </div>
-      </div>
 
-      <div className="max-w-2xl mx-auto px-4 md:px-6 py-6 flex flex-col gap-6">
+          <h1 className="text-white font-bold text-xl mb-6">Assinatura</h1>
+
+          {/* Plano atual */}
+          <div className="bg-gray-900/80 border border-gray-800 rounded-2xl p-5 mb-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <PlanoIcone size={16} className={plano.cor.split(' ')[0]} />
+                <span className="text-white font-semibold">Plano atual</span>
+              </div>
+              <span className={`text-xs px-3 py-1 rounded-full border font-medium ${plano.cor}`}>
+                {plano.nome}
+              </span>
+            </div>
+
+            {/* Trial info */}
+            {trialAtivo && (
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl px-4 py-3 mb-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Calendar size={13} className="text-blue-400" />
+                  <span className="text-blue-400 text-sm font-medium">
+                    {diasRestantes} {diasRestantes === 1 ? 'dia restante' : 'dias restantes'} de trial
+                  </span>
+                </div>
+                <p className="text-blue-300/60 text-xs">
+                  Plano selecionado após trial: <span className="text-blue-300 font-medium capitalize">{sub?.chosen_plan}</span> — R$ {sub?.chosen_plan === 'pro' ? '97' : '47'}/mês
+                </p>
+              </div>
+            )}
+
+            {/* Status ativo */}
+            {!trialAtivo && sub?.status === 'active' && sub.current_period_end && (
+              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-3 mb-4">
+                <p className="text-emerald-400 text-sm">
+                  Assinatura ativa até {new Date(sub.current_period_end).toLocaleDateString('pt-BR')}
+                </p>
+              </div>
+            )}
+
+            {/* Trial expirado */}
+            {!trialAtivo && sub?.status === 'expired' && (
+              <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 mb-4">
+                <p className="text-red-400 text-sm">
+                  Seu trial expirou. Assine um plano para continuar usando.
+                </p>
+              </div>
+            )}
+
+            {/* Uso de análises */}
+            <div className="flex items-center gap-2 mb-2">
+              <BarChart2 size={13} className="text-gray-500" />
+              <span className="text-gray-500 text-xs uppercase tracking-wider font-medium">Uso do mês</span>
+            </div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-gray-300 text-sm">Análises geradas</span>
+              <span className="text-white text-sm font-semibold">
+                {sub?.analyses_used ?? 0} / {sub?.analyses_limit ?? 3}
+              </span>
+            </div>
+            <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${
+                  percentUso >= 90 ? 'bg-red-500' : percentUso >= 70 ? 'bg-amber-500' : 'bg-emerald-500'
+                }`}
+                style={{ width: `${Math.min(percentUso, 100)}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Botão upgrade */}
+          {(sub?.plan === 'trial' || sub?.plan === 'starter') && (
+            <button
+              onClick={() => router.push('/planos')}
+              className="w-full bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold text-sm py-4 rounded-xl transition-colors flex items-center justify-center gap-2"
+            >
+              <Crown size={16} />
+              {sub?.plan === 'trial' ? 'Escolher plano' : 'Fazer upgrade para Pro'}
+            </button>
+          )}
+
+          {/* Gerenciar assinatura */}
+          {sub?.status === 'active' && (
+            <button className="w-full bg-gray-900 hover:bg-gray-800 border border-gray-800 text-gray-300 text-sm py-3 rounded-xl transition-colors mt-3">
+              Gerenciar assinatura
+            </button>
+          )}
+        </div>
+      </MainLayout>
+    )
+  }
+
+  // Seção: Menu principal do perfil
+  return (
+    <MainLayout>
+      <div className="max-w-2xl pt-2 md:pt-0">
+        <h1 className="text-white font-bold text-xl mb-6">Minha conta</h1>
 
         {/* Info do usuário */}
-        <div className="bg-gray-900/80 border border-gray-800 rounded-2xl p-5">
+        <div className="bg-gray-900/80 border border-gray-800 rounded-2xl p-5 mb-6">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center">
               <span className="text-emerald-400 text-lg font-bold">
@@ -93,93 +189,42 @@ export default function PerfilPage() {
               <p className="text-white font-semibold truncate">{user.user_metadata?.nome || user.email}</p>
               <p className="text-gray-500 text-sm truncate">{user.email}</p>
             </div>
-          </div>
-        </div>
-
-        {/* Plano atual */}
-        <div className="bg-gray-900/80 border border-gray-800 rounded-2xl p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <PlanoIcone size={16} className={plano.cor.split(' ')[0]} />
-              <span className="text-white font-semibold">Plano atual</span>
-            </div>
             <span className={`text-xs px-3 py-1 rounded-full border font-medium ${plano.cor}`}>
               {plano.nome}
             </span>
           </div>
-
-          {/* Trial info */}
-          {trialAtivo && (
-            <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl px-4 py-3 mb-4">
-              <div className="flex items-center gap-2 mb-1">
-                <Calendar size={13} className="text-blue-400" />
-                <span className="text-blue-400 text-sm font-medium">
-                  {diasRestantes} {diasRestantes === 1 ? 'dia restante' : 'dias restantes'} de trial
-                </span>
-              </div>
-              <p className="text-blue-300/60 text-xs">
-                Plano selecionado após trial: <span className="text-blue-300 font-medium capitalize">{sub?.chosen_plan}</span> — R$ {sub?.chosen_plan === 'pro' ? '97' : '47'}/mês
-              </p>
-            </div>
-          )}
-
-          {/* Status se não trial */}
-          {!trialAtivo && sub?.status === 'active' && sub.current_period_end && (
-            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-3 mb-4">
-              <p className="text-emerald-400 text-sm">
-                Assinatura ativa até {new Date(sub.current_period_end).toLocaleDateString('pt-BR')}
-              </p>
-            </div>
-          )}
-
-          {!trialAtivo && sub?.status === 'expired' && (
-            <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 mb-4">
-              <p className="text-red-400 text-sm">
-                Seu trial expirou. Assine um plano para continuar usando.
-              </p>
-            </div>
-          )}
-
-          {/* Uso de análises */}
-          <div className="flex items-center gap-2 mb-2">
-            <BarChart2 size={13} className="text-gray-500" />
-            <span className="text-gray-500 text-xs uppercase tracking-wider font-medium">Uso do mês</span>
-          </div>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-gray-300 text-sm">Análises geradas</span>
-            <span className="text-white text-sm font-semibold">
-              {sub?.analyses_used ?? 0} / {sub?.analyses_limit ?? 3}
-            </span>
-          </div>
-          <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all ${
-                percentUso >= 90 ? 'bg-red-500' : percentUso >= 70 ? 'bg-amber-500' : 'bg-emerald-500'
-              }`}
-              style={{ width: `${Math.min(percentUso, 100)}%` }}
-            />
-          </div>
         </div>
 
-        {/* Botão de upgrade (se trial ou starter) */}
-        {(sub?.plan === 'trial' || sub?.plan === 'starter') && (
+        {/* Menu de opções */}
+        <div className="bg-gray-900/80 border border-gray-800 rounded-2xl overflow-hidden mb-6">
+          <button
+            onClick={() => setSecao('assinatura')}
+            className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-800/50 transition-colors border-b border-gray-800"
+          >
+            <div className="flex items-center gap-3">
+              <CreditCard size={16} className="text-gray-500" />
+              <div className="text-left">
+                <p className="text-gray-200 text-sm font-medium">Assinatura</p>
+                <p className="text-gray-600 text-xs">Plano, uso e cobrança</p>
+              </div>
+            </div>
+            <ChevronRight size={14} className="text-gray-700" />
+          </button>
+
           <button
             onClick={() => router.push('/planos')}
-            className="w-full bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold text-sm py-4 rounded-xl transition-colors flex items-center justify-center gap-2"
+            className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-800/50 transition-colors"
           >
-            <Crown size={16} />
-            {sub?.plan === 'trial' ? 'Escolher plano' : 'Fazer upgrade para Pro'}
+            <div className="flex items-center gap-3">
+              <Crown size={16} className="text-gray-500" />
+              <div className="text-left">
+                <p className="text-gray-200 text-sm font-medium">Planos</p>
+                <p className="text-gray-600 text-xs">Ver planos e fazer upgrade</p>
+              </div>
+            </div>
+            <ChevronRight size={14} className="text-gray-700" />
           </button>
-        )}
-
-        {/* Gerenciar assinatura (se ativo) */}
-        {sub?.status === 'active' && (
-          <button
-            className="w-full bg-gray-900 hover:bg-gray-800 border border-gray-800 text-gray-300 text-sm py-3 rounded-xl transition-colors"
-          >
-            Gerenciar assinatura
-          </button>
-        )}
+        </div>
 
         {/* Sair */}
         <button
@@ -192,8 +237,7 @@ export default function PerfilPage() {
           <LogOut size={15} />
           Sair da conta
         </button>
-
       </div>
-    </div>
+    </MainLayout>
   )
 }
