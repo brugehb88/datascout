@@ -1,9 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { Calendar, Search, Trophy, Settings, LogOut, Menu, X, Check } from 'lucide-react'
+import { Search, Trophy, Settings, LogOut, Menu, X, Check, Lock, Crown } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useFiltros } from '@/store/filtros'
+import { useSubscription } from '@/hooks/useSubscription'
+import { ligaPermitida } from '@/config/ligas'
 
 function Logo() {
   return (
@@ -17,6 +20,8 @@ function Logo() {
 }
 
 function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
+  const router = useRouter()
+  const { planoEfetivo } = useSubscription()
   const {
     busca,
     setBusca,
@@ -31,6 +36,16 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
     l.toLowerCase().includes(busca.toLowerCase())
   )
   const todasSelecionadas = ligasSelecionadas.size === 0
+
+  function handleClickLiga(liga: string) {
+    const permitida = ligaPermitida(liga, planoEfetivo)
+    if (!permitida) {
+      router.push('/planos')
+      if (onFechar) onFechar()
+      return
+    }
+    toggleLiga(liga)
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -80,25 +95,38 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
         ) : (
           <div className="flex flex-col gap-1">
             {ligasFiltradas.map((liga) => {
-              const ativa = todasSelecionadas || ligasSelecionadas.has(liga)
+              const permitida = ligaPermitida(liga, planoEfetivo)
+              const ativa = permitida && (todasSelecionadas || ligasSelecionadas.has(liga))
+
               return (
                 <button
                   key={liga}
-                  onClick={() => toggleLiga(liga)}
+                  onClick={() => handleClickLiga(liga)}
                   className={`flex items-center gap-3 text-left text-sm px-3 py-2 rounded-lg transition-colors ${
-                    ativa
-                      ? 'text-gray-200 hover:bg-gray-900'
-                      : 'text-gray-600 hover:text-gray-400 hover:bg-gray-900'
+                    permitida
+                      ? ativa
+                        ? 'text-gray-200 hover:bg-gray-900'
+                        : 'text-gray-600 hover:text-gray-400 hover:bg-gray-900'
+                      : 'text-gray-700 hover:bg-gray-900/50 cursor-pointer'
                   }`}
                 >
-                  <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${
-                    ativa
-                      ? 'bg-emerald-500/20 border-emerald-500/50'
-                      : 'border-gray-700 bg-transparent'
-                  }`}>
-                    {ativa && <Check size={10} className="text-emerald-400" />}
-                  </div>
-                  <span className="truncate">{liga}</span>
+                  {permitida ? (
+                    <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${
+                      ativa
+                        ? 'bg-emerald-500/20 border-emerald-500/50'
+                        : 'border-gray-700 bg-transparent'
+                    }`}>
+                      {ativa && <Check size={10} className="text-emerald-400" />}
+                    </div>
+                  ) : (
+                    <Lock size={12} className="text-gray-700 flex-shrink-0" />
+                  )}
+                  <span className="truncate flex-1">{liga}</span>
+                  {!permitida && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium flex-shrink-0">
+                      PRO
+                    </span>
+                  )}
                 </button>
               )
             })}
@@ -109,7 +137,7 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
       {/* Footer */}
       <div className="p-4 border-t border-gray-800">
         <div className="flex items-center justify-between">
-       <a href="/perfil" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+          <a href="/perfil" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             <div className="w-7 h-7 rounded-full bg-emerald-500/20 flex items-center justify-center">
               <span className="text-emerald-400 text-xs font-bold">U</span>
             </div>
