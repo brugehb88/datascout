@@ -2,7 +2,7 @@ import { createBrowserClient } from '@supabase/ssr'
 
 let _supabase: ReturnType<typeof createBrowserClient> | null = null
 
-export function getSupabase() {
+function getSupabase() {
   if (!_supabase) {
     _supabase = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -12,10 +12,9 @@ export function getSupabase() {
   return _supabase
 }
 
-// Mantém export pra não quebrar imports existentes
-export const supabase = typeof window !== 'undefined'
-  ? createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
-  : (null as any)
+// Proxy que cria o client só quando realmente acessado
+export const supabase = new Proxy({} as ReturnType<typeof createBrowserClient>, {
+  get(_, prop) {
+    return (getSupabase() as any)[prop]
+  }
+})
