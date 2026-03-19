@@ -109,12 +109,12 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
       {/* Footer */}
       <div className="p-4 border-t border-gray-800">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+       <a href="/perfil" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             <div className="w-7 h-7 rounded-full bg-emerald-500/20 flex items-center justify-center">
               <span className="text-emerald-400 text-xs font-bold">U</span>
             </div>
             <span className="text-gray-400 text-sm">Minha conta</span>
-          </div>
+          </a>
           <div className="flex gap-2">
             <button className="text-gray-600 hover:text-gray-400 transition-colors">
               <Settings size={15} />
