@@ -1,12 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { Search, Trophy, Settings, LogOut, Menu, X, Check, Lock, Crown } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { Search, Trophy, Settings, LogOut, Menu, X, Check, Lock, Home } from 'lucide-react'
+import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useFiltros } from '@/store/filtros'
 import { useSubscription } from '@/hooks/useSubscription'
-import { ligaPermitida } from '@/config/ligas'
+import { ligaPermitida, LIGAS_PRO } from '@/config/ligas'
 
 function Logo() {
   return (
@@ -21,6 +21,7 @@ function Logo() {
 
 function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
   const router = useRouter()
+  const pathname = usePathname()
   const { planoEfetivo } = useSubscription()
   const {
     busca,
@@ -29,13 +30,17 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
     ligasSelecionadas,
     toggleLiga,
     selecionarTodasLigas,
+    jogos,
   } = useFiltros()
 
-  const ligas = ligasDisponiveis()
+  // Se tem jogos carregados, usa ligas dinâmicas. Senão, usa config.
+  const ligasDinamicas = ligasDisponiveis()
+  const ligas = ligasDinamicas.length > 0 ? ligasDinamicas : LIGAS_PRO
   const ligasFiltradas = ligas.filter(l =>
     l.toLowerCase().includes(busca.toLowerCase())
   )
   const todasSelecionadas = ligasSelecionadas.size === 0
+  const naHome = pathname === '/'
 
   function handleClickLiga(liga: string) {
     const permitida = ligaPermitida(liga, planoEfetivo)
@@ -44,14 +49,27 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
       if (onFechar) onFechar()
       return
     }
+    // Se não tá na home, vai pra home primeiro
+    if (!naHome) {
+      router.push('/')
+      if (onFechar) onFechar()
+      return
+    }
     toggleLiga(liga)
+  }
+
+  function handleHome() {
+    router.push('/')
+    if (onFechar) onFechar()
   }
 
   return (
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="p-5 border-b border-gray-800 flex items-center justify-between">
-        <Logo />
+        <button onClick={handleHome} className="hover:opacity-80 transition-opacity">
+          <Logo />
+        </button>
         {onFechar && (
           <button onClick={onFechar} className="text-gray-600 hover:text-gray-300 transition-colors">
             <X size={18} />
@@ -59,8 +77,23 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
         )}
       </div>
 
+      {/* Home button */}
+      <div className="px-4 pt-4 pb-2">
+        <button
+          onClick={handleHome}
+          className={`w-full flex items-center gap-3 text-left text-sm px-3 py-2.5 rounded-lg transition-colors ${
+            naHome
+              ? 'bg-emerald-500/10 text-emerald-400 font-medium'
+              : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900'
+          }`}
+        >
+          <Home size={15} />
+          <span>Jogos</span>
+        </button>
+      </div>
+
       {/* Busca */}
-      <div className="p-4 border-b border-gray-800">
+      <div className="px-4 pb-4 border-b border-gray-800">
         <div className="relative">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
           <input
@@ -73,7 +106,7 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
         </div>
       </div>
 
-      {/* Ligas dinâmicas */}
+      {/* Ligas */}
       <div className="p-4 flex-1 overflow-y-auto">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-1">
@@ -90,48 +123,44 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
           )}
         </div>
 
-        {ligas.length === 0 ? (
-          <p className="text-gray-600 text-sm py-4 text-center">Carregando ligas...</p>
-        ) : (
-          <div className="flex flex-col gap-1">
-            {ligasFiltradas.map((liga) => {
-              const permitida = ligaPermitida(liga, planoEfetivo)
-              const ativa = permitida && (todasSelecionadas || ligasSelecionadas.has(liga))
+        <div className="flex flex-col gap-1">
+          {ligasFiltradas.map((liga) => {
+            const permitida = ligaPermitida(liga, planoEfetivo)
+            const ativa = permitida && (todasSelecionadas || ligasSelecionadas.has(liga))
 
-              return (
-                <button
-                  key={liga}
-                  onClick={() => handleClickLiga(liga)}
-                  className={`flex items-center gap-3 text-left text-sm px-3 py-2 rounded-lg transition-colors ${
-                    permitida
-                      ? ativa
-                        ? 'text-gray-200 hover:bg-gray-900'
-                        : 'text-gray-600 hover:text-gray-400 hover:bg-gray-900'
-                      : 'text-gray-700 hover:bg-gray-900/50 cursor-pointer'
-                  }`}
-                >
-                  {permitida ? (
-                    <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${
-                      ativa
-                        ? 'bg-emerald-500/20 border-emerald-500/50'
-                        : 'border-gray-700 bg-transparent'
-                    }`}>
-                      {ativa && <Check size={10} className="text-emerald-400" />}
-                    </div>
-                  ) : (
-                    <Lock size={12} className="text-gray-700 flex-shrink-0" />
-                  )}
-                  <span className="truncate flex-1">{liga}</span>
-                  {!permitida && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium flex-shrink-0">
-                      PRO
-                    </span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        )}
+            return (
+              <button
+                key={liga}
+                onClick={() => handleClickLiga(liga)}
+                className={`flex items-center gap-3 text-left text-sm px-3 py-2 rounded-lg transition-colors ${
+                  permitida
+                    ? ativa
+                      ? 'text-gray-200 hover:bg-gray-900'
+                      : 'text-gray-600 hover:text-gray-400 hover:bg-gray-900'
+                    : 'text-gray-700 hover:bg-gray-900/50 cursor-pointer'
+                }`}
+              >
+                {permitida ? (
+                  <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${
+                    ativa
+                      ? 'bg-emerald-500/20 border-emerald-500/50'
+                      : 'border-gray-700 bg-transparent'
+                  }`}>
+                    {ativa && <Check size={10} className="text-emerald-400" />}
+                  </div>
+                ) : (
+                  <Lock size={12} className="text-gray-700 flex-shrink-0" />
+                )}
+                <span className="truncate flex-1">{liga}</span>
+                {!permitida && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium flex-shrink-0">
+                    PRO
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* Footer */}
@@ -144,9 +173,6 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
             <span className="text-gray-400 text-sm">Minha conta</span>
           </a>
           <div className="flex gap-2">
-            <button className="text-gray-600 hover:text-gray-400 transition-colors">
-              <Settings size={15} />
-            </button>
             <button
               onClick={async () => {
                 await supabase.auth.signOut()
