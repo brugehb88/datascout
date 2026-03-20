@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, Crown, Zap, ArrowLeft, Sparkles, Shield, History, FileText, Bell, Globe, Timer } from 'lucide-react'
+import { Check, Crown, Zap, Sparkles, Shield, History, FileText, Bell, Globe, Timer } from 'lucide-react'
 import MainLayout from '@/components/layout/mainlayout'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
@@ -24,7 +24,8 @@ const planos = [
     features: [
       { icone: Sparkles, texto: '30 análises pré-jogo por mês' },
       { icone: Globe, texto: '10 ligas principais (BR + Europa top 5)' },
-      { icone: Shield, texto: 'Veredito estatístico potencializado por IA' },    ],
+      { icone: Shield, texto: 'Veredito estatístico potencializado por IA' },
+    ],
     ligas: [
       'Brasileirão Série A', 'Brasileirão Série B', 'Copa do Brasil',
       'Libertadores', 'Sul-Americana',
@@ -63,6 +64,7 @@ export default function PlanosPage() {
   const [sub, setSub] = useState<Subscription | null>(null)
   const [loading, setLoading] = useState(true)
   const [planoExpandido, setPlanoExpandido] = useState<string | null>(null)
+  const [processando, setProcessando] = useState(false)
 
   useEffect(() => {
     async function carregar() {
@@ -80,27 +82,31 @@ export default function PlanosPage() {
   }, [user, authLoading])
 
   async function handleEscolherPlano(planoId: string) {
-    if (!user) return
+    if (!user || processando) return
+    setProcessando(true)
 
-    // Se trial, salva o plano escolhido
-    if (sub?.status === 'trialing') {
-      await supabase
-        .from('subscriptions')
-        .update({ chosen_plan: planoId })
-        .eq('user_id', user.id)
+    const priceId = planoId === 'pro'
+      ? process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO
+      : process.env.NEXT_PUBLIC_STRIPE_PRICE_STARTER
 
-      setSub(prev => prev ? { ...prev, chosen_plan: planoId } : prev)
-      return
+    try {
+      const response = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceId, planId: planoId }),
+      })
+
+      const data = await response.json()
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        console.error('Erro no checkout:', data.error)
+      }
+    } catch (err) {
+      console.error('Erro ao iniciar checkout:', err)
+    } finally {
+      setProcessando(false)
     }
-
-    // TODO: quando Stripe estiver pronto, redireciona pro checkout
-    // Por agora, salva a escolha
-    await supabase
-      .from('subscriptions')
-      .update({ chosen_plan: planoId })
-      .eq('user_id', user.id)
-
-    setSub(prev => prev ? { ...prev, chosen_plan: planoId } : prev)
   }
 
   if (authLoading || loading) {
@@ -136,7 +142,6 @@ export default function PlanosPage() {
         {/* Cards de plano */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {planos.map((plano) => {
-            const selecionado = sub?.chosen_plan === plano.id
             const planoAtual = sub?.plan === plano.id && sub?.status === 'active'
             const Icone = plano.icone
             const corBorder = plano.cor === 'amber' ? 'border-amber-500/30' : 'border-emerald-500/30'
@@ -150,7 +155,7 @@ export default function PlanosPage() {
               <div
                 key={plano.id}
                 className={`bg-gray-900/80 border rounded-2xl p-5 flex flex-col transition-all ${
-                  selecionado || plano.destaque
+                  plano.destaque
                     ? `${corBorder} ${corBg}`
                     : 'border-gray-800'
                 }`}
@@ -208,16 +213,13 @@ export default function PlanosPage() {
                   <div className="w-full text-center text-sm text-gray-500 py-3 border border-gray-800 rounded-xl">
                     Plano atual
                   </div>
-                ) : selecionado && sub?.status === 'trialing' ? (
-                  <div className={`w-full text-center text-sm ${corTexto} py-3 border ${corBorder} rounded-xl font-medium`}>
-                    ✓ Selecionado para após o trial
-                  </div>
                 ) : (
                   <button
                     onClick={() => handleEscolherPlano(plano.id)}
-                    className={`w-full font-bold text-sm py-3 rounded-xl transition-colors ${corBtn}`}
+                    disabled={processando}
+                    className={`w-full font-bold text-sm py-3 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${corBtn}`}
                   >
-                    {sub?.status === 'trialing' ? 'Selecionar este plano' : 'Assinar agora'}
+                    {processando ? 'Redirecionando...' : 'Assinar agora'}
                   </button>
                 )}
               </div>
@@ -228,7 +230,7 @@ export default function PlanosPage() {
         {/* Nota sobre trial */}
         {sub?.status === 'trialing' && (
           <p className="text-gray-600 text-xs text-center mt-6">
-            Você não será cobrado durante o período de trial. A cobrança inicia automaticamente ao final dos 7 dias no plano selecionado.
+            Ao assinar, você inicia um trial de 7 dias. A cobrança acontece apenas ao final do período.
           </p>
         )}
       </div>
