@@ -5,8 +5,6 @@ import { Clock, ChevronRight, Zap, Loader2 } from 'lucide-react'
 import { Jogo } from '@/types'
 import { buscarJogosDodia } from '@/lib/api'
 import { useFiltros } from '@/store/filtros'
-import { useSubscription } from '@/hooks/useSubscription'
-import { ligaPermitida } from '@/config/ligas'
 
 interface Props {
   onSelecionarJogo: (jogo: Jogo) => void
@@ -23,10 +21,9 @@ export default function ListaJogos({ onSelecionarJogo, jogoSelecionado }: Props)
     ligaSelecionada,
   } = useFiltros()
 
-  const { planoEfetivo } = useSubscription()
 
   // Filtra por liga selecionada + busca, depois filtra por ligas do plano
-  const filtrados = jogosFiltrados().filter(jogo => ligaPermitida(jogo.liga, planoEfetivo))
+  const filtrados = jogosFiltrados()
 
   useEffect(() => {
     async function carregar() {

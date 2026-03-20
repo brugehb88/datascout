@@ -6,7 +6,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useFiltros } from '@/store/filtros'
 import { useSubscription } from '@/hooks/useSubscription'
-import { ligaPermitida, LIGAS_PRO, displayName } from '@/config/ligas'
+import { ligaPermitida, LIGAS_PRO, displayName, canonizar } from '@/config/ligas'
 
 function Logo() {
   return (
@@ -94,8 +94,8 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
     if (onFechar) onFechar()
   }
 
-  function contarJogos(liga: string): number {
-    return jogos.filter(j => j.liga === liga).length
+  function contarJogos(ligaCanonica: string): number {
+    return jogos.filter(j => canonizar(j.liga) === ligaCanonica).length
   }
 
   return (

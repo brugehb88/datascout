@@ -1,27 +1,21 @@
 import { create } from 'zustand'
 import { Jogo } from '@/types'
+import { canonizar } from '@/config/ligas'
 
 interface FiltrosState {
-  // Dados
   jogos: Jogo[]
   setJogos: (jogos: Jogo[]) => void
 
-  // Liga selecionada (null = todas)
   ligaSelecionada: string | null
   setLiga: (liga: string | null) => void
 
-  // Busca por nome
   busca: string
   setBusca: (busca: string) => void
 
-  // Período
   periodo: 'hoje' | 'amanha' | 'semana'
   setPeriodo: (periodo: 'hoje' | 'amanha' | 'semana') => void
 
-  // Jogos filtrados (derivado)
   jogosFiltrados: () => Jogo[]
-
-  // Ligas disponíveis (derivado dos jogos)
   ligasDisponiveis: () => string[]
 }
 
@@ -38,19 +32,25 @@ export const useFiltros = create<FiltrosState>((set, get) => ({
   periodo: 'hoje',
   setPeriodo: (periodo) => set({ periodo }),
 
+  // Ligas disponíveis = nomes canônicos únicos (só ligas reconhecidas)
   ligasDisponiveis: () => {
     const { jogos } = get()
-    return [...new Set(jogos.map(j => j.liga))].sort()
+    const canonicas = jogos
+      .map(j => canonizar(j.liga))
+      .filter((c): c is string => c !== null)
+    return [...new Set(canonicas)].sort()
   },
 
   jogosFiltrados: () => {
     const { jogos, ligaSelecionada, busca } = get()
 
     return jogos.filter(jogo => {
+      // Só ligas reconhecidas
+      const canonica = canonizar(jogo.liga)
+      if (!canonica) return false
+
       // Filtro de liga
-      if (ligaSelecionada && jogo.liga !== ligaSelecionada) {
-        return false
-      }
+      if (ligaSelecionada && canonica !== ligaSelecionada) return false
 
       // Filtro de busca
       if (busca.trim()) {
@@ -58,7 +58,7 @@ export const useFiltros = create<FiltrosState>((set, get) => ({
         const match =
           jogo.time_casa.toLowerCase().includes(termo) ||
           jogo.time_fora.toLowerCase().includes(termo) ||
-          jogo.liga.toLowerCase().includes(termo)
+          canonica.toLowerCase().includes(termo)
         if (!match) return false
       }
 

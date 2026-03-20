@@ -1,74 +1,94 @@
-// Nomes exatos como vêm da API
-export const LIGAS_STARTER: string[] = [
-  // Brasileiras
-  'Serie A',              // Brasileirão (API retorna "Serie A" genérico)
-  'Copa Do Brasil',
-  // Sul-americanas
-  'Libertadores',
-  'Copa Libertadores',
-  'CONMEBOL Libertadores',
-  'Sul-Americana',
-  'CONMEBOL Sudamericana',
-  // Europa top 5
-  'Premier League',
-  'La Liga',
-  'Ligue 1',
-  'Bundesliga',
-  // Variações que a API pode mandar
-  'Brasileirão Série A',
-  'Brasileirão Série B',
-  'Serie B',
-]
-
-export const LIGAS_PRO: string[] = [
-  ...LIGAS_STARTER,
-  // Champions / Europa
-  'UEFA Champions League',
-  'Champions League',
-  'UEFA Europa League',
-  'UEFA Europa Conference League',
-  // Américas
-  'MLS',
-  'Liga MX',
-  // Europa extras
-  'Eredivisie',
-  'Primeira Liga',
-  'Liga Portugal',
-  'Scottish Premiership',
-  'Süper Lig',
-  'Saudi Professional League',
-  'Saudi Pro League',
-  // Seleções
-  'Copa do Mundo',
-  'World Cup',
-  'Eurocopa',
-  'Euro Championship',
-]
-
-// Nomes de display mais bonitos pro sidebar
-export const DISPLAY_NAMES: Record<string, string> = {
-  'Serie A': 'Serie A Italiana',
+// Mapa: nome exato da API → nome canônico de display
+// REGRA: se a liga da API não está aqui, NÃO aparece no app. Ponto.
+const MAPA_LIGAS: Record<string, string> = {
+  // === STARTER ===
   'Copa Do Brasil': 'Copa do Brasil',
-  'Süper Lig': 'Turkish Süper Lig',
-  'UEFA Europa League': 'Europa League',
-  'UEFA Europa Conference League': 'Conference League',
+  'Copa do Brasil': 'Copa do Brasil',
+  'CONMEBOL Libertadores': 'Libertadores',
+  'Libertadores': 'Libertadores',
+  'Copa Libertadores': 'Libertadores',
+  'CONMEBOL Sudamericana': 'Sul-Americana',
+  'Sul-Americana': 'Sul-Americana',
+  'Premier League': 'Premier League',
+  'La Liga': 'La Liga',
+  'Serie A': 'Serie A Italiana',
+  'Ligue 1': 'Ligue 1',
+  'Bundesliga': 'Bundesliga',
+
+  // === PRO ===
   'UEFA Champions League': 'Champions League',
+  'Champions League': 'Champions League',
+  'UEFA Europa League': 'Europa League',
+  'Europa League': 'Europa League',
+  'UEFA Europa Conference League': 'Conference League',
+  'Conference League': 'Conference League',
+  'MLS': 'MLS',
+  'Liga MX': 'Liga MX',
+  'Eredivisie': 'Eredivisie',
+  'Primeira Liga': 'Primeira Liga',
+  'Liga Portugal': 'Primeira Liga',
+  'Scottish Premiership': 'Scottish Premiership',
+  'Süper Lig': 'Turkish Süper Lig',
+  'Super Lig': 'Turkish Süper Lig',
+  'Saudi Professional League': 'Saudi Pro League',
+  'Saudi Pro League': 'Saudi Pro League',
+  'Copa do Mundo': 'Copa do Mundo',
+  'World Cup': 'Copa do Mundo',
+  'Eurocopa': 'Eurocopa',
+  'Euro Championship': 'Eurocopa',
 }
 
-export function displayName(liga: string): string {
-  return DISPLAY_NAMES[liga] ?? liga
+const CANONICAS_STARTER = [
+  'Brasileirão Série A',
+  'Brasileirão Série B',
+  'Copa do Brasil',
+  'Libertadores',
+  'Sul-Americana',
+  'Premier League',
+  'La Liga',
+  'Serie A Italiana',
+  'Bundesliga',
+  'Ligue 1',
+]
+
+const CANONICAS_PRO = [
+  ...CANONICAS_STARTER,
+  'Champions League',
+  'Europa League',
+  'Conference League',
+  'MLS',
+  'Liga MX',
+  'Eredivisie',
+  'Primeira Liga',
+  'Scottish Premiership',
+  'Turkish Süper Lig',
+  'Saudi Pro League',
+  'Copa do Mundo',
+  'Eurocopa',
+]
+
+export function canonizar(ligaDaApi: string): string | null {
+  return MAPA_LIGAS[ligaDaApi] ?? null
+}
+
+export function displayName(ligaDaApi: string): string {
+  return MAPA_LIGAS[ligaDaApi] ?? ligaDaApi
 }
 
 export function ligasDoPlano(plano: string): string[] {
   switch (plano) {
-    case 'pro': return LIGAS_PRO
-    case 'starter': return LIGAS_STARTER
-    case 'trial': return LIGAS_STARTER
-    default: return LIGAS_STARTER
+    case 'pro': return CANONICAS_PRO
+    case 'starter': return CANONICAS_STARTER
+    case 'trial': return CANONICAS_STARTER
+    default: return CANONICAS_STARTER
   }
 }
 
-export function ligaPermitida(ligaDoJogo: string, plano: string): boolean {
-  const permitidas = ligasDoPlano(plano)
-  return permitidas.some(l => l.toLowerCase() === ligaDoJogo.toLowerCase())
+export function ligaPermitida(ligaDaApi: string, plano: string): boolean {
+  const canonica = canonizar(ligaDaApi)
+  if (!canonica) return false
+  return ligasDoPlano(plano).includes(canonica)
 }
+
+export const LIGAS_STARTER = CANONICAS_STARTER
+export const LIGAS_PRO = CANONICAS_PRO
