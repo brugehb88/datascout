@@ -36,7 +36,7 @@ export const useFiltros = create<FiltrosState>((set, get) => ({
   ligasDisponiveis: () => {
     const { jogos } = get()
     const canonicas = jogos
-      .map(j => canonizar(j.liga))
+      .map(j => canonizar(j.league_id))
       .filter((c): c is string => c !== null)
     return [...new Set(canonicas)].sort()
   },
@@ -46,7 +46,7 @@ export const useFiltros = create<FiltrosState>((set, get) => ({
 
     return jogos.filter(jogo => {
       // Só ligas reconhecidas
-      const canonica = canonizar(jogo.liga)
+      const canonica = canonizar(jogo.league_id)
       if (!canonica) return false
 
       // Filtro de liga

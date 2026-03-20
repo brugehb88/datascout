@@ -6,7 +6,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useFiltros } from '@/store/filtros'
 import { useSubscription } from '@/hooks/useSubscription'
-import { ligaPermitida, LIGAS_PRO, displayName, canonizar } from '@/config/ligas'
+import { ligaPermitidaPorNome, LIGAS_PRO, canonizar } from '@/config/ligas'
 
 function Logo() {
   return (
@@ -69,7 +69,7 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
   const naHome = pathname === '/'
 
   function handleClickLiga(liga: string) {
-    const permitida = ligaPermitida(liga, planoEfetivo)
+    const permitida = ligaPermitidaPorNome(liga, planoEfetivo)
     if (!permitida) {
       router.push('/planos')
       if (onFechar) onFechar()
@@ -95,7 +95,7 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
   }
 
   function contarJogos(ligaCanonica: string): number {
-    return jogos.filter(j => canonizar(j.liga) === ligaCanonica).length
+    return jogos.filter(j => canonizar(j.league_id) === ligaCanonica).length
   }
 
   return (
@@ -123,7 +123,7 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
           }`}
         >
           <Home size={15} />
-          <span>Todos os jogos</span>
+          <span>Início</span>
         </button>
       </div>
 
@@ -150,7 +150,7 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
 
         <div className="flex flex-col gap-1">
           {ligasFiltradas.map((liga) => {
-            const permitida = ligaPermitida(liga, planoEfetivo)
+            const permitida = ligaPermitidaPorNome(liga, planoEfetivo)
             const ativa = ligaSelecionada === liga
             const qtd = contarJogos(liga)
 
@@ -169,7 +169,7 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
                 {!permitida && (
                   <Lock size={12} className="text-gray-700 flex-shrink-0" />
                 )}
-                <span className="truncate flex-1">{displayName(liga)}</span>
+                <span className="truncate flex-1">{liga}</span>
                 {!permitida ? (
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium flex-shrink-0">
                     PRO

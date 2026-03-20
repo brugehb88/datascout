@@ -1,86 +1,56 @@
-const MAPA_LIGAS: Record<string, string> = {
+// Mapa por league_id (API-Football) — fonte definitiva de verdade
+interface LigaConfig {
+  nome: string
+  plano: 'starter' | 'pro'
+}
+
+const MAPA_POR_ID: Record<number, LigaConfig> = {
   // === STARTER ===
-  'Copa Do Brasil': 'Copa do Brasil',
-  'Copa do Brasil': 'Copa do Brasil',
-  'CONMEBOL Libertadores': 'Libertadores',
-  'Libertadores': 'Libertadores',
-  'Copa Libertadores': 'Libertadores',
-  'CONMEBOL Sudamericana': 'Sul-Americana',
-  'Sul-Americana': 'Sul-Americana',
-  'La Liga': 'La Liga',
-  'Serie A': 'Serie A Italiana',
-  'Ligue 1': 'Ligue 1',
-  'Bundesliga': 'Bundesliga',
+  71:  { nome: 'Brasileirão Série A', plano: 'starter' },
+  72:  { nome: 'Brasileirão Série B', plano: 'starter' },
+  73:  { nome: 'Copa do Brasil', plano: 'starter' },
+  13:  { nome: 'Libertadores', plano: 'starter' },
+  11:  { nome: 'Sul-Americana', plano: 'starter' },
+  39:  { nome: 'Premier League', plano: 'starter' },
+  140: { nome: 'La Liga', plano: 'starter' },
+  135: { nome: 'Serie A Italiana', plano: 'starter' },
+  78:  { nome: 'Bundesliga', plano: 'starter' },
+  61:  { nome: 'Ligue 1', plano: 'starter' },
 
   // === PRO ===
-  'UEFA Champions League': 'Champions League',
-  'Champions League': 'Champions League',
-  'UEFA Europa League': 'Europa League',
-  'Europa League': 'Europa League',
-  'UEFA Europa Conference League': 'Conference League',
-  'Conference League': 'Conference League',
-  'MLS': 'MLS',
-  'Liga MX': 'Liga MX',
-  'Eredivisie': 'Eredivisie',
-  'Primeira Liga': 'Primeira Liga',
-  'Liga Portugal': 'Primeira Liga',
-  'Scottish Premiership': 'Scottish Premiership',
-  'Süper Lig': 'Turkish Süper Lig',
-  'Super Lig': 'Turkish Süper Lig',
-  'Saudi Professional League': 'Saudi Pro League',
-  'Saudi Pro League': 'Saudi Pro League',
-  'Copa do Mundo': 'Copa do Mundo',
-  'World Cup': 'Copa do Mundo',
-  'Eurocopa': 'Eurocopa',
-  'Euro Championship': 'Eurocopa',
+  2:   { nome: 'Champions League', plano: 'pro' },
+  3:   { nome: 'Europa League', plano: 'pro' },
+  848: { nome: 'Conference League', plano: 'pro' },
+  253: { nome: 'MLS', plano: 'pro' },
+  262: { nome: 'Liga MX', plano: 'pro' },
+  88:  { nome: 'Eredivisie', plano: 'pro' },
+  94:  { nome: 'Primeira Liga', plano: 'pro' },
+  179: { nome: 'Scottish Premiership', plano: 'pro' },
+  203: { nome: 'Turkish Süper Lig', plano: 'pro' },
+  307: { nome: 'Saudi Pro League', plano: 'pro' },
+  1:   { nome: 'Copa do Mundo', plano: 'pro' },
+  4:   { nome: 'Eurocopa', plano: 'pro' },
 }
 
-// NOTE: "Premier League" e "Brasileirão" removidos do mapa por enquanto.
-// "Premier League" é ambíguo (Inglaterra, Cazaquistão, Gana...).
-// "Brasileirão" não aparece na API com esse nome.
-// Solução definitiva: adicionar league_id no n8n.
-// Ligas que dependem de league_id pra funcionar:
-// - Premier League (England) = league_id 39
-// - Brasileirão Série A = league_id 71
-// - Brasileirão Série B = league_id 72
+// Nomes canônicos por plano
+const CANONICAS_STARTER = Object.values(MAPA_POR_ID)
+  .filter(l => l.plano === 'starter')
+  .map(l => l.nome)
 
-const CANONICAS_STARTER = [
-  'Brasileirão Série A',
-  'Brasileirão Série B',
-  'Copa do Brasil',
-  'Libertadores',
-  'Sul-Americana',
-  'Premier League',
-  'La Liga',
-  'Serie A Italiana',
-  'Bundesliga',
-  'Ligue 1',
-]
+const CANONICAS_PRO = Object.values(MAPA_POR_ID)
+  .map(l => l.nome)
 
-const CANONICAS_PRO = [
-  ...CANONICAS_STARTER,
-  'Champions League',
-  'Europa League',
-  'Conference League',
-  'MLS',
-  'Liga MX',
-  'Eredivisie',
-  'Primeira Liga',
-  'Scottish Premiership',
-  'Turkish Süper Lig',
-  'Saudi Pro League',
-  'Copa do Mundo',
-  'Eurocopa',
-]
-
-export function canonizar(ligaDaApi: string): string | null {
-  return MAPA_LIGAS[ligaDaApi] ?? null
+// Dado um league_id, retorna o nome canônico ou null se não reconhecida
+export function canonizar(leagueId: number): string | null {
+  return MAPA_POR_ID[leagueId]?.nome ?? null
 }
 
-export function displayName(ligaDaApi: string): string {
-  return MAPA_LIGAS[ligaDaApi] ?? ligaDaApi
+// Retorna o nome bonito pra display
+export function displayName(leagueId: number): string {
+  return MAPA_POR_ID[leagueId]?.nome ?? 'Desconhecida'
 }
 
+// Retorna ligas canônicas do plano
 export function ligasDoPlano(plano: string): string[] {
   switch (plano) {
     case 'pro': return CANONICAS_PRO
@@ -90,15 +60,18 @@ export function ligasDoPlano(plano: string): string[] {
   }
 }
 
-// Aceita tanto nome da API quanto nome canônico
-export function ligaPermitida(liga: string, plano: string): boolean {
+// Checa se o league_id é permitido no plano
+export function ligaPermitida(leagueId: number, plano: string): boolean {
+  const config = MAPA_POR_ID[leagueId]
+  if (!config) return false
+  if (plano === 'pro') return true
+  return config.plano === 'starter'
+}
+
+// Checa pelo nome canônico (pra sidebar)
+export function ligaPermitidaPorNome(nomeCanonica: string, plano: string): boolean {
   const permitidas = ligasDoPlano(plano)
-  // Primeiro tenta como canônico direto
-  if (permitidas.includes(liga)) return true
-  // Depois tenta canonizar (nome da API)
-  const canonica = canonizar(liga)
-  if (!canonica) return false
-  return permitidas.includes(canonica)
+  return permitidas.includes(nomeCanonica)
 }
 
 export const LIGAS_STARTER = CANONICAS_STARTER

@@ -1,5 +1,6 @@
 export interface Jogo {
   id: number
+  league_id: number
   time_casa: string
   time_fora: string
   horario: string
