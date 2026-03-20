@@ -1,9 +1,7 @@
 'use client'
 
-import { useEffect } from 'react'
 import { Clock, ChevronRight, Zap, Loader2 } from 'lucide-react'
 import { Jogo } from '@/types'
-import { buscarJogosDodia } from '@/lib/api'
 import { useFiltros } from '@/store/filtros'
 
 interface Props {
@@ -14,29 +12,13 @@ interface Props {
 export default function ListaJogos({ onSelecionarJogo, jogoSelecionado }: Props) {
   const {
     jogos,
-    setJogos,
     jogosFiltrados,
     periodo,
     setPeriodo,
     ligaSelecionada,
   } = useFiltros()
 
-
-  // Filtra por liga selecionada + busca, depois filtra por ligas do plano
   const filtrados = jogosFiltrados()
-
-  useEffect(() => {
-    async function carregar() {
-      try {
-        const dados = await buscarJogosDodia()
-        setJogos(dados)
-      } catch {
-        console.error('Não foi possível carregar os jogos.')
-      }
-    }
-    carregar()
-  }, [periodo, setJogos])
-
   const carregando = jogos.length === 0
   const ligasUnicas = [...new Set(filtrados.map(j => j.liga))]
 
@@ -80,60 +62,47 @@ export default function ListaJogos({ onSelecionarJogo, jogoSelecionado }: Props)
           <p className="text-gray-600 text-sm">
             {ligaSelecionada
               ? `Nenhum jogo encontrado para ${ligaSelecionada}.`
-              : 'Nenhum jogo encontrado para os filtros selecionados.'}
+              : 'Nenhum jogo encontrado.'}
           </p>
         </div>
       )}
 
-      {/* Lista agrupada por liga */}
-      {ligasUnicas.map(liga => (
-        <div key={liga}>
-          {!ligaSelecionada && (
-            <div className="flex items-center gap-2 mb-2 px-1">
-              <span className="text-gray-500 text-xs uppercase tracking-wider font-medium">{liga}</span>
-              <div className="flex-1 h-px bg-gray-800" />
-              <span className="text-gray-700 text-xs">{filtrados.filter(j => j.liga === liga).length}</span>
+      {/* Lista de jogos */}
+      {filtrados.map(jogo => (
+        <button
+          key={jogo.id}
+          onClick={() => onSelecionarJogo(jogo)}
+          className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all text-left ${
+            jogoSelecionado?.id === jogo.id
+              ? 'bg-emerald-500/10 border-emerald-500/30'
+              : 'bg-gray-900/50 border-gray-800 hover:bg-gray-900 hover:border-gray-700'
+          }`}
+        >
+          <div className="flex items-center gap-4 flex-1 min-w-0">
+            <div className="flex flex-col items-center gap-1 min-w-[52px]">
+              {jogo.status === 'ao_vivo' ? (
+                <span className="flex items-center gap-1 text-red-400 text-xs font-semibold">
+                  <Zap size={10} className="fill-red-400" /> AO VIVO
+                </span>
+              ) : jogo.status === 'encerrado' ? (
+                <span className="text-gray-600 text-xs">FIM</span>
+              ) : (
+                <span className="flex items-center gap-1 text-gray-400 text-xs">
+                  <Clock size={10} /> {jogo.horario}
+                </span>
+              )}
             </div>
-          )}
-          <div className="flex flex-col gap-1">
-            {filtrados.filter(j => j.liga === liga).map(jogo => (
-              <button
-                key={jogo.id}
-                onClick={() => onSelecionarJogo(jogo)}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition-all text-left ${
-                  jogoSelecionado?.id === jogo.id
-                    ? 'bg-emerald-500/10 border-emerald-500/30'
-                    : 'bg-gray-900/50 border-gray-800 hover:bg-gray-900 hover:border-gray-700'
-                }`}
-              >
-                <div className="flex items-center gap-4 flex-1 min-w-0">
-                  <div className="flex flex-col items-center gap-1 min-w-[52px]">
-                    {jogo.status === 'ao_vivo' ? (
-                      <span className="flex items-center gap-1 text-red-400 text-xs font-semibold">
-                        <Zap size={10} className="fill-red-400" /> AO VIVO
-                      </span>
-                    ) : jogo.status === 'encerrado' ? (
-                      <span className="text-gray-600 text-xs">FIM</span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-gray-400 text-xs">
-                        <Clock size={10} /> {jogo.horario}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-                    <span className={`text-sm font-medium truncate ${jogoSelecionado?.id === jogo.id ? 'text-white' : 'text-gray-200'}`}>
-                      {jogo.time_casa}
-                    </span>
-                    <span className={`text-sm truncate ${jogoSelecionado?.id === jogo.id ? 'text-gray-300' : 'text-gray-400'}`}>
-                      {jogo.time_fora}
-                    </span>
-                  </div>
-                </div>
-                <ChevronRight size={14} className={`flex-shrink-0 transition-colors ${jogoSelecionado?.id === jogo.id ? 'text-emerald-400' : 'text-gray-700'}`} />
-              </button>
-            ))}
+            <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+              <span className={`text-sm font-medium truncate ${jogoSelecionado?.id === jogo.id ? 'text-white' : 'text-gray-200'}`}>
+                {jogo.time_casa}
+              </span>
+              <span className={`text-sm truncate ${jogoSelecionado?.id === jogo.id ? 'text-gray-300' : 'text-gray-400'}`}>
+                {jogo.time_fora}
+              </span>
+            </div>
           </div>
-        </div>
+          <ChevronRight size={14} className={`flex-shrink-0 transition-colors ${jogoSelecionado?.id === jogo.id ? 'text-emerald-400' : 'text-gray-700'}`} />
+        </button>
       ))}
     </div>
   )

@@ -63,7 +63,17 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
 
   const ligasDinamicas = ligasDisponiveis()
   const ligas = ligasDinamicas.length > 0 ? ligasDinamicas : LIGAS_PRO
-  const ligasFiltradas = ligas.filter(l =>
+
+  // Ordenar: liberadas primeiro, PRO depois, alfabético dentro de cada grupo
+  const ligasOrdenadas = [...ligas].sort((a, b) => {
+    const aPermitida = ligaPermitidaPorNome(a, planoEfetivo)
+    const bPermitida = ligaPermitidaPorNome(b, planoEfetivo)
+    if (aPermitida && !bPermitida) return -1
+    if (!aPermitida && bPermitida) return 1
+    return a.localeCompare(b)
+  })
+
+  const ligasFiltradas = ligasOrdenadas.filter(l =>
     l.toLowerCase().includes(busca.toLowerCase())
   )
   const naHome = pathname === '/'

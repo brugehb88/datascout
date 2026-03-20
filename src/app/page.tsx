@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Target, ArrowLeft, Trophy } from 'lucide-react'
 import MainLayout from '@/components/layout/mainlayout'
 import ListaJogos from '@/components/dashboard/ListaJogos'
@@ -8,11 +8,25 @@ import PainelJogo from '@/components/dashboard/PainelJogo'
 import { Jogo } from '@/types'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useFiltros } from '@/store/filtros'
+import { buscarJogosDodia } from '@/lib/api'
 
 export default function Home() {
   const [jogoSelecionado, setJogoSelecionado] = useState<Jogo | null>(null)
   const [painelMobileAberto, setPainelMobileAberto] = useState(false)
-  const { ligaSelecionada } = useFiltros()
+  const { ligaSelecionada, setJogos, periodo } = useFiltros()
+
+  // Carrega jogos no nível da page — nunca desmonta
+  useEffect(() => {
+    async function carregar() {
+      try {
+        const dados = await buscarJogosDodia()
+        setJogos(dados)
+      } catch {
+        console.error('Não foi possível carregar os jogos.')
+      }
+    }
+    carregar()
+  }, [periodo, setJogos])
 
   function handleSelecionarJogo(jogo: Jogo) {
     setJogoSelecionado(jogo)
@@ -25,14 +39,13 @@ export default function Home() {
     setPainelMobileAberto(false)
   }
 
-  // Se nenhuma liga tá selecionada, mostra tela de boas vindas
   const mostrarBoasVindas = !ligaSelecionada
 
   return (
     <MainLayout>
       <div className="flex flex-col md:flex-row gap-6 pt-2 md:pt-0 min-w-0">
 
-        {/* Lista de jogos (só aparece quando liga está selecionada) */}
+        {/* Lista de jogos */}
         {!mostrarBoasVindas && (
           <div className="w-full md:w-80 md:flex-shrink-0">
             <div className="mb-4">
@@ -79,7 +92,7 @@ export default function Home() {
 
       </div>
 
-      {/* Mobile: painel como overlay fullscreen */}
+      {/* Mobile: painel como overlay */}
       <AnimatePresence>
         {painelMobileAberto && jogoSelecionado && (
           <>
@@ -111,7 +124,6 @@ export default function Home() {
                   <p className="text-gray-500 text-xs">{jogoSelecionado.liga}</p>
                 </div>
               </div>
-
               <div className="flex-1 overflow-y-auto px-4 py-4">
                 <PainelJogo jogo={jogoSelecionado} />
               </div>
