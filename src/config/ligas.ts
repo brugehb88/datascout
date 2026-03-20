@@ -1,5 +1,3 @@
-// Mapa: nome exato da API → nome canônico de display
-// REGRA: se a liga da API não está aqui, NÃO aparece no app. Ponto.
 const MAPA_LIGAS: Record<string, string> = {
   // === STARTER ===
   'Copa Do Brasil': 'Copa do Brasil',
@@ -9,7 +7,6 @@ const MAPA_LIGAS: Record<string, string> = {
   'Copa Libertadores': 'Libertadores',
   'CONMEBOL Sudamericana': 'Sul-Americana',
   'Sul-Americana': 'Sul-Americana',
-  'Premier League': 'Premier League',
   'La Liga': 'La Liga',
   'Serie A': 'Serie A Italiana',
   'Ligue 1': 'Ligue 1',
@@ -37,6 +34,15 @@ const MAPA_LIGAS: Record<string, string> = {
   'Eurocopa': 'Eurocopa',
   'Euro Championship': 'Eurocopa',
 }
+
+// NOTE: "Premier League" e "Brasileirão" removidos do mapa por enquanto.
+// "Premier League" é ambíguo (Inglaterra, Cazaquistão, Gana...).
+// "Brasileirão" não aparece na API com esse nome.
+// Solução definitiva: adicionar league_id no n8n.
+// Ligas que dependem de league_id pra funcionar:
+// - Premier League (England) = league_id 39
+// - Brasileirão Série A = league_id 71
+// - Brasileirão Série B = league_id 72
 
 const CANONICAS_STARTER = [
   'Brasileirão Série A',
@@ -84,10 +90,15 @@ export function ligasDoPlano(plano: string): string[] {
   }
 }
 
-export function ligaPermitida(ligaDaApi: string, plano: string): boolean {
-  const canonica = canonizar(ligaDaApi)
+// Aceita tanto nome da API quanto nome canônico
+export function ligaPermitida(liga: string, plano: string): boolean {
+  const permitidas = ligasDoPlano(plano)
+  // Primeiro tenta como canônico direto
+  if (permitidas.includes(liga)) return true
+  // Depois tenta canonizar (nome da API)
+  const canonica = canonizar(liga)
   if (!canonica) return false
-  return ligasDoPlano(plano).includes(canonica)
+  return permitidas.includes(canonica)
 }
 
 export const LIGAS_STARTER = CANONICAS_STARTER

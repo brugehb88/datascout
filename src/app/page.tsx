@@ -1,16 +1,18 @@
 'use client'
 
 import { useState } from 'react'
-import { Target, ArrowLeft } from 'lucide-react'
+import { Target, ArrowLeft, Trophy } from 'lucide-react'
 import MainLayout from '@/components/layout/mainlayout'
 import ListaJogos from '@/components/dashboard/ListaJogos'
 import PainelJogo from '@/components/dashboard/PainelJogo'
 import { Jogo } from '@/types'
 import { AnimatePresence, motion } from 'framer-motion'
+import { useFiltros } from '@/store/filtros'
 
 export default function Home() {
   const [jogoSelecionado, setJogoSelecionado] = useState<Jogo | null>(null)
   const [painelMobileAberto, setPainelMobileAberto] = useState(false)
+  const { ligaSelecionada } = useFiltros()
 
   function handleSelecionarJogo(jogo: Jogo) {
     setJogoSelecionado(jogo)
@@ -23,24 +25,49 @@ export default function Home() {
     setPainelMobileAberto(false)
   }
 
+  // Se nenhuma liga tá selecionada, mostra tela de boas vindas
+  const mostrarBoasVindas = !ligaSelecionada
+
   return (
     <MainLayout>
       <div className="flex flex-col md:flex-row gap-6 pt-2 md:pt-0 min-w-0">
 
-        {/* Lista de jogos */}
-        <div className="w-full md:w-80 md:flex-shrink-0">
-          <div className="mb-4">
-            <h1 className="text-white font-bold text-xl">Jogos</h1>
+        {/* Lista de jogos (só aparece quando liga está selecionada) */}
+        {!mostrarBoasVindas && (
+          <div className="w-full md:w-80 md:flex-shrink-0">
+            <div className="mb-4">
+              <h1 className="text-white font-bold text-xl">{ligaSelecionada}</h1>
+            </div>
+            <ListaJogos
+              onSelecionarJogo={handleSelecionarJogo}
+              jogoSelecionado={jogoSelecionado}
+            />
           </div>
-          <ListaJogos
-            onSelecionarJogo={handleSelecionarJogo}
-            jogoSelecionado={jogoSelecionado}
-          />
-        </div>
+        )}
 
-        {/* Desktop: painel inline */}
-        <div className="hidden md:block flex-1">
-          {jogoSelecionado ? (
+        {/* Desktop: painel ou boas vindas */}
+        <div className={`${mostrarBoasVindas ? 'w-full' : 'hidden md:block flex-1'}`}>
+          {mostrarBoasVindas ? (
+            <div className="flex flex-col items-center justify-center py-20 max-w-md mx-auto">
+              <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-6">
+                <Trophy size={28} className="text-emerald-400" />
+              </div>
+              <h1 className="text-white font-bold text-2xl mb-2 text-center">Bem-vindo ao DataScout</h1>
+              <p className="text-gray-500 text-sm text-center leading-relaxed mb-8">
+                Selecione uma liga no menu lateral para ver os jogos disponíveis e gerar análises estatísticas com veredito.
+              </p>
+              <div className="grid grid-cols-2 gap-3 w-full">
+                <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-4 text-center">
+                  <p className="text-emerald-400 text-2xl font-bold">4</p>
+                  <p className="text-gray-500 text-xs mt-1">Mercados por jogo</p>
+                </div>
+                <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-4 text-center">
+                  <p className="text-emerald-400 text-2xl font-bold">10+</p>
+                  <p className="text-gray-500 text-xs mt-1">Ligas disponíveis</p>
+                </div>
+              </div>
+            </div>
+          ) : jogoSelecionado ? (
             <PainelJogo jogo={jogoSelecionado} />
           ) : (
             <div className="flex flex-col items-center justify-center h-64 bg-gray-900/30 rounded-2xl border border-dashed border-gray-800 mt-12">
