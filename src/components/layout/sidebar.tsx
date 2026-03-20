@@ -6,7 +6,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useFiltros } from '@/store/filtros'
 import { useSubscription } from '@/hooks/useSubscription'
-import { ligaPermitida, LIGAS_PRO } from '@/config/ligas'
+import { ligaPermitida, LIGAS_PRO, displayName } from '@/config/ligas'
 
 function Logo() {
   return (
@@ -169,7 +169,7 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
                 {!permitida && (
                   <Lock size={12} className="text-gray-700 flex-shrink-0" />
                 )}
-                <span className="truncate flex-1">{liga}</span>
+                <span className="truncate flex-1">{displayName(liga)}</span>
                 {!permitida ? (
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium flex-shrink-0">
                     PRO
