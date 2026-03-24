@@ -23,16 +23,16 @@ function CreditosBar() {
   const { sub } = useSubscription()
   if (!sub) return null
 
-  const restantes = Math.max(0, sub.analyses_limit - sub.analyses_used)
   const percent = Math.round((sub.analyses_used / sub.analyses_limit) * 100)
+  const restantes = Math.max(0, sub.analyses_limit - sub.analyses_used)
 
   return (
     <div className="px-4 pb-2">
       <div className="bg-gray-900/80 border border-gray-800 rounded-xl px-3 py-2.5">
         <div className="flex items-center justify-between mb-1.5">
-          <span className="text-gray-500 text-xs">Análises restantes</span>
+          <span className="text-gray-500 text-xs">Créditos</span>
           <span className={`text-xs font-semibold ${restantes <= 1 ? 'text-red-400' : restantes <= 3 ? 'text-amber-400' : 'text-emerald-400'}`}>
-            {restantes} de {sub.analyses_limit}
+            {sub.analyses_used} / {sub.analyses_limit}
           </span>
         </div>
         <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
@@ -64,7 +64,6 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
   const ligasDinamicas = ligasDisponiveis()
   const ligas = ligasDinamicas.length > 0 ? ligasDinamicas : LIGAS_PRO
 
-  // Ordenar: liberadas primeiro, PRO depois, alfabético dentro de cada grupo
   const ligasOrdenadas = [...ligas].sort((a, b) => {
     const aPermitida = ligaPermitidaPorNome(a, planoEfetivo)
     const bPermitida = ligaPermitidaPorNome(b, planoEfetivo)
