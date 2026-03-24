@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, Crown, Zap, Sparkles, Shield, History, FileText, Bell, Globe, Timer } from 'lucide-react'
+import { Crown, Zap, Sparkles, Shield, History, FileText, Bell, Globe, Timer, Check } from 'lucide-react'
 import MainLayout from '@/components/layout/mainlayout'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
@@ -11,6 +11,7 @@ interface Subscription {
   plan: string
   status: string
   chosen_plan: string
+  stripe_subscription_id: string | null
 }
 
 const planos = [
@@ -73,7 +74,7 @@ export default function PlanosPage() {
       if (!user) return
       const { data, error } = await supabase
         .from('subscriptions')
-        .select('plan, status, chosen_plan')
+        .select('plan, status, chosen_plan, stripe_subscription_id')
         .eq('user_id', user.id)
         .single()
 
@@ -120,10 +121,14 @@ export default function PlanosPage() {
     )
   }
 
+  // Determinar plano efetivo do usuário
+  const planoAtualId = sub?.status === 'active' ? sub.plan : sub?.chosen_plan || 'starter'
+  const emTrial = sub?.status === 'trialing'
+  const assinaturaAtiva = sub?.status === 'active'
+
   return (
     <MainLayout>
       <div className="max-w-3xl pt-2 md:pt-0">
-        {/* Header */}
         <button
           onClick={() => router.push('/perfil')}
           className="text-gray-500 text-sm hover:text-gray-300 transition-colors mb-4"
@@ -134,44 +139,77 @@ export default function PlanosPage() {
         <div className="mb-8">
           <h1 className="text-white font-bold text-xl mb-1">Escolha seu plano</h1>
           <p className="text-gray-500 text-sm">
-            {sub?.status === 'trialing'
-              ? 'Selecione o plano que será ativado ao final do seu trial.'
-              : 'Assine para acessar análises completas.'}
+            {emTrial
+              ? 'Você está no trial gratuito. Assine agora para garantir acesso contínuo ou aguarde o fim do período de teste.'
+              : assinaturaAtiva
+                ? 'Gerencie sua assinatura ou faça upgrade/downgrade.'
+                : 'Assine para acessar análises completas.'}
           </p>
         </div>
 
         {/* Cards de plano */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {planos.map((plano) => {
-            const planoAtual = sub?.plan === plano.id && sub?.status === 'active'
             const Icone = plano.icone
-            const corBorder = plano.cor === 'amber' ? 'border-amber-500/30' : 'border-emerald-500/30'
-            const corBg = plano.cor === 'amber' ? 'bg-amber-500/5' : 'bg-emerald-500/5'
+            const isPlanoAtual = planoAtualId === plano.id
+            const isAtivo = assinaturaAtiva && sub?.plan === plano.id
+
+            const corBorder = isPlanoAtual
+              ? plano.cor === 'amber' ? 'border-amber-500/30' : 'border-emerald-500/30'
+              : 'border-gray-800'
+            const corBg = isPlanoAtual
+              ? plano.cor === 'amber' ? 'bg-amber-500/5' : 'bg-emerald-500/5'
+              : ''
             const corTexto = plano.cor === 'amber' ? 'text-amber-400' : 'text-emerald-400'
             const corBtn = plano.cor === 'amber'
               ? 'bg-amber-500 hover:bg-amber-400 text-gray-950'
               : 'bg-emerald-500 hover:bg-emerald-400 text-gray-950'
 
+            // Determinar label do botão
+            let btnLabel = 'Assinar agora'
+            let btnDisabled = false
+
+            if (isAtivo) {
+              btnLabel = 'Plano atual'
+              btnDisabled = true
+            } else if (emTrial && isPlanoAtual) {
+              btnLabel = 'Antecipar assinatura'
+            } else if (emTrial && !isPlanoAtual) {
+              btnLabel = 'Assinar este plano'
+            } else if (assinaturaAtiva && plano.id === 'pro') {
+              btnLabel = 'Fazer upgrade'
+            } else if (assinaturaAtiva && plano.id === 'starter') {
+              btnLabel = 'Fazer downgrade'
+            }
+
             return (
               <div
                 key={plano.id}
-                className={`bg-gray-900/80 border rounded-2xl p-5 flex flex-col transition-all ${
-                  plano.destaque
-                    ? `${corBorder} ${corBg}`
-                    : 'border-gray-800'
-                }`}
+                className={`bg-gray-900/80 border rounded-2xl p-5 flex flex-col transition-all ${corBorder} ${corBg}`}
               >
-                {/* Header do plano */}
+                {/* Header */}
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <Icone size={18} className={corTexto} />
                     <span className="text-white font-bold text-lg">{plano.nome}</span>
                   </div>
-                  {plano.destaque && (
-                    <span className="text-xs px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">
-                      Mais popular
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {isPlanoAtual && (
+                      <span className={`text-xs px-2.5 py-1 rounded-full border font-medium flex items-center gap-1 ${
+                        plano.cor === 'amber'
+                          ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                          : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                      }`}>
+                        <Check size={10} />
+                        {emTrial ? 'Selecionado' : 'Atual'}
+                      </span>
+                    )}
+                    {plano.destaque && !isPlanoAtual && (
+                      <span className="text-xs px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">
+                        Mais popular
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <p className="text-gray-500 text-sm mb-4">{plano.descricao}</p>
@@ -210,9 +248,16 @@ export default function PlanosPage() {
                 )}
 
                 {/* Botão */}
-                {planoAtual ? (
-                  <div className="w-full text-center text-sm text-gray-500 py-3 border border-gray-800 rounded-xl">
-                    Plano atual
+                {btnDisabled ? (
+                  <div className={`w-full text-center text-sm py-3 rounded-xl border font-medium ${
+                    plano.cor === 'amber'
+                      ? 'text-amber-400 border-amber-500/20'
+                      : 'text-emerald-400 border-emerald-500/20'
+                  }`}>
+                    <span className="flex items-center justify-center gap-1.5">
+                      <Check size={14} />
+                      Plano atual
+                    </span>
                   </div>
                 ) : (
                   <button
@@ -220,7 +265,7 @@ export default function PlanosPage() {
                     disabled={processando}
                     className={`w-full font-bold text-sm py-3 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${corBtn}`}
                   >
-                    {processando ? 'Redirecionando...' : 'Assinar agora'}
+                    {processando ? 'Redirecionando...' : btnLabel}
                   </button>
                 )}
               </div>
@@ -228,8 +273,8 @@ export default function PlanosPage() {
           })}
         </div>
 
-        {/* Nota sobre trial */}
-        {sub?.status === 'trialing' && (
+        {/* Nota */}
+        {emTrial && (
           <p className="text-gray-600 text-xs text-center mt-6">
             Ao assinar, você inicia um trial de 7 dias. A cobrança acontece apenas ao final do período.
           </p>
