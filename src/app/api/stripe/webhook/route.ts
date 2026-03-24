@@ -4,12 +4,15 @@ import { createClient } from '@supabase/supabase-js'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 async function updateSubscription(userId: string, data: any) {
+  const supabaseAdmin = getSupabaseAdmin()
   await supabaseAdmin
     .from('subscriptions')
     .update({ ...data, updated_at: new Date().toISOString() })
