@@ -18,6 +18,7 @@ const planos = [
     id: 'starter',
     nome: 'Starter',
     preco: 47,
+    priceId: 'price_1TD8roRxwIWmS22ixQgm2ZZh',
     cor: 'emerald',
     icone: Zap,
     descricao: 'Ideal pra quem quer começar com análises sólidas nas ligas principais.',
@@ -36,6 +37,7 @@ const planos = [
     id: 'pro',
     nome: 'Pro',
     preco: 97,
+    priceId: 'price_1TD8s2RxwIWmS22iHrCNAvE0',
     cor: 'amber',
     icone: Crown,
     destaque: true,
@@ -85,9 +87,8 @@ export default function PlanosPage() {
     if (!user || processando) return
     setProcessando(true)
 
-    const priceId = planoId === 'pro'
-      ? process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO
-      : process.env.NEXT_PUBLIC_STRIPE_PRICE_STARTER
+    const planoConfig = planos.find(p => p.id === planoId)
+    const priceId = planoConfig?.priceId
 
     try {
       const response = await fetch('/api/stripe/checkout', {
