@@ -1,11 +1,14 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Target, Zap, TrendingUp, Flag, ChevronRight, Brain, Swords, Shield, History, Home, Plane, BarChart2, Sparkles, Clock } from 'lucide-react'
+import { Target, Zap, TrendingUp, Flag, ChevronRight, Brain, Swords, Shield, History, Home, Plane, BarChart2, Sparkles, Clock, Lock, Crown } from 'lucide-react'
 import { Jogo } from '@/types'
 import { Drawer, Metrica, Secao } from './Drawer'
 import { supabase } from '@/lib/supabase'
+import { useSubscription } from '@/hooks/useSubscription'
+import { ligaPermitida } from '@/config/ligas'
 
 const nivelCor: Record<string, string> = {
   alta: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
@@ -37,6 +40,88 @@ const mercadosConfig = [
 
 interface Props {
   jogo: Jogo
+}
+
+function CaixaGerarAnalise({ jogo, onGerar }: { jogo: Jogo; onGerar: () => void }) {
+  const { sub, planoEfetivo } = useSubscription()
+  const router = useRouter()
+
+  const semCreditos = sub ? sub.analyses_used >= sub.analyses_limit : false
+  const ligaBloqueada = !ligaPermitida(jogo.league_id, planoEfetivo)
+
+  if (ligaBloqueada) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col items-center justify-center py-16 bg-gray-900/30 rounded-2xl border border-dashed border-gray-800"
+      >
+        <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-4">
+          <Lock size={24} className="text-amber-400" />
+        </div>
+        <h3 className="text-white font-semibold text-base mb-1">Liga exclusiva do plano Pro</h3>
+        <p className="text-gray-500 text-sm text-center mb-6 max-w-xs">
+          Faça upgrade para acessar análises de todas as ligas.
+        </p>
+        <button
+          onClick={() => router.push('/planos')}
+          className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-gray-950 font-bold text-sm px-6 py-3 rounded-xl transition-colors"
+        >
+          <Crown size={16} />
+          Ver planos
+        </button>
+      </motion.div>
+    )
+  }
+
+  if (semCreditos) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col items-center justify-center py-16 bg-gray-900/30 rounded-2xl border border-dashed border-gray-800"
+      >
+        <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-4">
+          <Sparkles size={24} className="text-red-400" />
+        </div>
+        <h3 className="text-white font-semibold text-base mb-1">Créditos esgotados</h3>
+        <p className="text-gray-500 text-sm text-center mb-6 max-w-xs">
+          Você usou todas as suas análises deste período. Faça upgrade para ter mais créditos.
+        </p>
+        <button
+          onClick={() => router.push('/planos')}
+          className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold text-sm px-6 py-3 rounded-xl transition-colors"
+        >
+          <Crown size={16} />
+          Ver planos
+        </button>
+      </motion.div>
+    )
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex flex-col items-center justify-center py-16 bg-gray-900/30 rounded-2xl border border-dashed border-gray-800"
+    >
+      <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-4">
+        <Sparkles size={24} className="text-emerald-400" />
+      </div>
+      <h3 className="text-white font-semibold text-base mb-1">Análise não gerada</h3>
+      <p className="text-gray-500 text-sm text-center mb-6 max-w-xs">
+        Clique para gerar a análise completa deste confronto com dados estatísticos e veredito.
+      </p>
+      <button
+        onClick={onGerar}
+        className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold text-sm px-6 py-3 rounded-xl transition-colors"
+      >
+        <Sparkles size={16} />
+        Gerar análise
+      </button>
+      <p className="text-gray-600 text-xs mt-3">Consome 1 crédito de análise</p>
+    </motion.div>
+  )
 }
 
 function AnaliseResultado({ jogo, dados }: { jogo: Jogo; dados: any }) {
@@ -194,7 +279,6 @@ export default function PainelJogo({ jogo }: Props) {
   async function gerarAnalise() {
     setGerando(true)
     try {
-      // 1. Verifica cache primeiro
       const cache = await verificarCache()
       if (cache) {
         setAnalise(cache)
@@ -202,7 +286,6 @@ export default function PainelJogo({ jogo }: Props) {
         return
       }
 
-      // 2. Chama o n8n
       const response = await fetch(`${process.env.NEXT_PUBLIC_N8N_URL}/analise`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -220,10 +303,8 @@ export default function PainelJogo({ jogo }: Props) {
         gerada_em: new Date().toISOString(),
       }
 
-      // 3. Salva no cache
       await salvarCache(analiseFormatada)
 
-      // 4. Incrementa contador de análises
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         await supabase.rpc('incrementar_analise', { uid: user.id })
@@ -238,7 +319,6 @@ export default function PainelJogo({ jogo }: Props) {
       }
 
       setAnalise(analiseFormatada)
-
     } catch (err) {
       console.error('Erro ao gerar análise:', err)
     } finally {
@@ -299,27 +379,7 @@ export default function PainelJogo({ jogo }: Props) {
 
       {/* Estado: aguardando geração */}
       {!analise && !gerando && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col items-center justify-center py-16 bg-gray-900/30 rounded-2xl border border-dashed border-gray-800"
-        >
-          <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-4">
-            <Sparkles size={24} className="text-emerald-400" />
-          </div>
-          <h3 className="text-white font-semibold text-base mb-1">Análise não gerada</h3>
-          <p className="text-gray-500 text-sm text-center mb-6 max-w-xs">
-            Clique para gerar a análise completa deste confronto com dados estatísticos e veredito.
-          </p>
-          <button
-            onClick={gerarAnalise}
-            className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold text-sm px-6 py-3 rounded-xl transition-colors"
-          >
-            <Sparkles size={16} />
-            Gerar análise
-          </button>
-          <p className="text-gray-600 text-xs mt-3">Consome 1 crédito de análise</p>
-        </motion.div>
+        <CaixaGerarAnalise jogo={jogo} onGerar={gerarAnalise} />
       )}
 
       {/* Estado: gerando */}
