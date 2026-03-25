@@ -13,30 +13,11 @@ function getSupabaseAdmin() {
 
 async function updateSubscription(userId: string, data: any) {
   const supabaseAdmin = getSupabaseAdmin()
-  await supabaseAdmin
+  const { error } = await supabaseAdmin
     .from('subscriptions')
     .update({ ...data, updated_at: new Date().toISOString() })
     .eq('user_id', userId)
-}
-
-// Extrair subscription ID de diferentes formatos da API Stripe
-function getSubscriptionId(obj: any): string | null {
-  return obj.subscription
-    || obj.parent?.subscription_details?.subscription
-    || null
-}
-
-// Extrair metadata de diferentes formatos
-function getMetadata(obj: any): { userId?: string; planId?: string } {
-  const meta = obj.metadata && Object.keys(obj.metadata).length > 0
-    ? obj.metadata
-    : obj.parent?.subscription_details?.metadata
-      || obj.subscription_details?.metadata
-      || {}
-  return {
-    userId: meta.supabase_user_id,
-    planId: meta.plan_id,
-  }
+  if (error) console.error('Supabase update error:', error)
 }
 
 export async function POST(request: NextRequest) {
@@ -56,67 +37,100 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
   }
 
-  try {
-    const obj = event.data.object
-    console.log('Webhook event:', event.type, JSON.stringify(obj, null, 2).substring(0, 500))
+  const obj = event.data.object
 
+  // Helpers para extrair dados de qualquer versão da API Stripe
+  const getMeta = (o: any) => {
+    if (o.metadata && Object.keys(o.metadata).length > 0) return o.metadata
+    if (o.parent?.subscription_details?.metadata) return o.parent.subscription_details.metadata
+    return {}
+  }
+
+  const getSubId = (o: any): string | null => {
+    return o.subscription || o.parent?.subscription_details?.subscription || null
+  }
+
+  try {
     switch (event.type) {
       case 'checkout.session.completed': {
-        const { userId, planId } = getMetadata(obj)
-        const subId = getSubscriptionId(obj)
-        if (!userId || !planId || !subId) {
-          console.log('checkout.session.completed: missing data', { userId, planId, subId })
+        const meta = getMeta(obj)
+        const userId = meta.supabase_user_id
+        const planId = meta.plan_id
+        const subId = getSubId(obj)
+
+        if (!userId || !planId) {
+          console.log('checkout: missing userId or planId', meta)
           break
         }
 
-        const sub = await stripe.subscriptions.retrieve(subId)
+        // Calcular trial end (7 dias a partir de agora)
+        const trialEnd = new Date()
+        trialEnd.setDate(trialEnd.getDate() + 7)
+
+        // Calcular period end (1 mês a partir de agora, após trial)
+        const periodEnd = new Date()
+        periodEnd.setDate(periodEnd.getDate() + 37) // 7 dias trial + 30 dias
 
         await updateSubscription(userId, {
           plan: planId,
-          status: sub.status === 'trialing' ? 'trialing' : 'active',
+          status: 'trialing',
           stripe_subscription_id: subId,
           stripe_customer_id: obj.customer,
           chosen_plan: planId,
           analyses_limit: planId === 'pro' ? 150 : 30,
           analyses_used: 0,
-          trial_ends_at: sub.trial_end
-            ? new Date(sub.trial_end * 1000).toISOString()
-            : null,
-          current_period_start: new Date((sub as any).current_period_start * 1000).toISOString(),
-          current_period_end: new Date((sub as any).current_period_end * 1000).toISOString(),
+          trial_ends_at: trialEnd.toISOString(),
+          current_period_start: new Date().toISOString(),
+          current_period_end: periodEnd.toISOString(),
         })
-        console.log('checkout.session.completed: updated user', userId)
+        console.log('checkout.session.completed: success for', userId)
         break
       }
 
       case 'invoice.paid': {
-        const subId = getSubscriptionId(obj)
-        if (!subId) {
-          console.log('invoice.paid: no subscription id')
-          break
+        const subId = getSubId(obj)
+        if (!subId) break
+
+        // Buscar metadata da subscription via lines
+        const meta = getMeta(obj)
+        let userId = meta.supabase_user_id
+
+        // Se não tem na invoice metadata, tenta nas lines
+        if (!userId && obj.lines?.data?.[0]) {
+          const lineMeta = obj.lines.data[0].metadata || {}
+          userId = lineMeta.supabase_user_id
         }
-        const sub = await stripe.subscriptions.retrieve(subId)
-        const { userId } = getMetadata(sub)
+
+        // Se ainda não tem, tenta no parent
+        if (!userId && obj.parent?.subscription_details?.metadata) {
+          userId = obj.parent.subscription_details.metadata.supabase_user_id
+        }
+
         if (!userId) {
-          console.log('invoice.paid: no user id in subscription metadata')
+          console.log('invoice.paid: no user id found')
           break
         }
+
+        // Calcular próximo período (1 mês)
+        const nextPeriodEnd = new Date()
+        nextPeriodEnd.setMonth(nextPeriodEnd.getMonth() + 1)
 
         await updateSubscription(userId, {
           status: 'active',
           analyses_used: 0,
-          current_period_start: new Date((sub as any).current_period_start * 1000).toISOString(),
-          current_period_end: new Date((sub as any).current_period_end * 1000).toISOString(),
+          current_period_start: new Date().toISOString(),
+          current_period_end: nextPeriodEnd.toISOString(),
         })
-        console.log('invoice.paid: updated user', userId)
+        console.log('invoice.paid: success for', userId)
         break
       }
 
       case 'invoice.payment_failed': {
-        const subId = getSubscriptionId(obj)
-        if (!subId) break
-        const sub = await stripe.subscriptions.retrieve(subId)
-        const { userId } = getMetadata(sub)
+        const meta = getMeta(obj)
+        let userId = meta.supabase_user_id
+        if (!userId && obj.parent?.subscription_details?.metadata) {
+          userId = obj.parent.subscription_details.metadata.supabase_user_id
+        }
         if (!userId) break
 
         await updateSubscription(userId, { status: 'past_due' })
@@ -124,7 +138,8 @@ export async function POST(request: NextRequest) {
       }
 
       case 'customer.subscription.deleted': {
-        const { userId } = getMetadata(obj)
+        const meta = getMeta(obj)
+        const userId = meta.supabase_user_id
         if (!userId) break
 
         await updateSubscription(userId, {
@@ -137,15 +152,19 @@ export async function POST(request: NextRequest) {
       }
 
       case 'customer.subscription.updated': {
-        const { userId } = getMetadata(obj)
+        const meta = getMeta(obj)
+        const userId = meta.supabase_user_id
         if (!userId) break
 
-        await updateSubscription(userId, {
+        const updateData: any = {
           status: obj.status === 'trialing' ? 'trialing' : obj.status,
-          current_period_end: obj.current_period_end
-            ? new Date(obj.current_period_end * 1000).toISOString()
-            : undefined,
-        })
+        }
+
+        if (obj.current_period_end) {
+          updateData.current_period_end = new Date(obj.current_period_end * 1000).toISOString()
+        }
+
+        await updateSubscription(userId, updateData)
         break
       }
     }
