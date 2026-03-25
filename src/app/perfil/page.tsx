@@ -15,6 +15,7 @@ interface Subscription {
   trial_ends_at: string | null
   chosen_plan: string
   current_period_end: string | null
+  stripe_subscription_id: string | null
 }
 
 const planConfig: Record<string, { nome: string; cor: string; icone: any }> = {
@@ -161,10 +162,21 @@ export default function PerfilPage() {
           )}
 
           {/* Gerenciar assinatura */}
-          {sub?.status === 'active' && (
-            <button className="w-full bg-gray-900 hover:bg-gray-800 border border-gray-800 text-gray-300 text-sm py-3 rounded-xl transition-colors mt-3">
-              Gerenciar assinatura
-            </button>
+          {sub?.stripe_subscription_id && (
+            <button
+            onClick={async () => {
+              try {
+                const res = await fetch('/api/stripe/portal', { method: 'POST' })
+                const data = await res.json()
+                if (data.url) window.location.href = data.url
+              } catch (err) {
+                console.error('Erro ao abrir portal:', err)
+              }
+            }}
+            className="w-full bg-gray-900 hover:bg-gray-800 border border-gray-800 text-gray-300 text-sm py-3 rounded-xl transition-colors"
+          >
+            Gerenciar assinatura
+          </button>
           )}
         </div>
       </MainLayout>
