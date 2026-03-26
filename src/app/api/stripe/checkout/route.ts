@@ -6,7 +6,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 
 export async function POST(request: NextRequest) {
   try {
-    const { priceId, planId } = await request.json()
+    const { priceId, planId, skipTrial } = await request.json()
 
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
       success_url: `${origin}/perfil?checkout=success`,
       cancel_url: `${origin}/planos?checkout=canceled`,
       subscription_data: {
-        trial_period_days: 7,
+        ...(skipTrial ? {} : { trial_period_days: 7 }),
         metadata: {
           supabase_user_id: user.id,
           plan_id: planId,

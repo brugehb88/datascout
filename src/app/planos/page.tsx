@@ -92,10 +92,11 @@ export default function PlanosPage() {
     const priceId = planoConfig?.priceId
 
     try {
+      const skipTrial = sub?.status === 'trialing'
       const response = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ priceId, planId: planoId }),
+        body: JSON.stringify({ priceId, planId: planoId, skipTrial }),
       })
 
       const data = await response.json()
