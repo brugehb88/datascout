@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { History, Crown, Target, Zap, TrendingUp, Flag, Calendar, Lock } from 'lucide-react'
+import { History, Crown, Target, Zap, TrendingUp, Flag, Calendar, Lock, FileDown } from 'lucide-react'
 import MainLayout from '@/components/layout/mainlayout'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useSubscription } from '@/hooks/useSubscription'
+import { exportarAnalisePdf } from '@/lib/exportPdf'
 
 interface AnaliseHistorico {
   id: string
@@ -53,7 +54,6 @@ export default function HistoricoPage() {
         return
       }
 
-      // Buscar logs do usuário
       const { data: logs, error: logsError } = await supabase
         .from('analysis_log')
         .select('*')
@@ -66,14 +66,12 @@ export default function HistoricoPage() {
         return
       }
 
-      // Buscar dados das análises correspondentes
       const fixtureIds = [...new Set(logs.map(l => l.fixture_id))]
       const { data: analisesData } = await supabase
         .from('analises')
         .select('fixture_id, resultado, ambas_marcam, total_gols, escanteios')
         .in('fixture_id', fixtureIds)
 
-      // Combinar
       const analisesMap = new Map(
         (analisesData || []).map(a => [a.fixture_id, a])
       )
@@ -105,7 +103,6 @@ export default function HistoricoPage() {
     )
   }
 
-  // Bloqueado pra quem não é Pro
   if (bloqueado) {
     return (
       <MainLayout>
@@ -131,7 +128,6 @@ export default function HistoricoPage() {
     )
   }
 
-  // Agrupar por data
   const agrupado = analises.reduce((acc, a) => {
     const data = new Date(a.created_at).toLocaleDateString('pt-BR', {
       weekday: 'long',
@@ -195,7 +191,6 @@ export default function HistoricoPage() {
                           </div>
                         </div>
 
-                        {/* Mini resumo dos mercados */}
                         {item.analise && (
                           <div className="flex gap-3 mt-3 pt-3 border-t border-gray-800">
                             {(['resultado', 'ambas_marcam', 'total_gols', 'escanteios'] as const).map((mercado) => {
@@ -215,7 +210,6 @@ export default function HistoricoPage() {
                         )}
                       </button>
 
-                      {/* Expandido: detalhes */}
                       {expandido === item.id && item.analise && (
                         <div className="bg-gray-900/50 border border-gray-800 border-t-0 rounded-b-2xl px-4 py-4 -mt-2">
                           <div className="grid grid-cols-2 gap-3">
@@ -243,6 +237,22 @@ export default function HistoricoPage() {
                               )
                             })}
                           </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              exportarAnalisePdf({
+                                home_team: item.home_team,
+                                away_team: item.away_team,
+                                league: item.league,
+                                created_at: item.created_at,
+                                analise: item.analise!,
+                              })
+                            }}
+                            className="w-full mt-3 flex items-center justify-center gap-2 bg-gray-900 hover:bg-gray-800 border border-gray-800 text-gray-300 text-sm py-2.5 rounded-xl transition-colors"
+                          >
+                            <FileDown size={14} />
+                            Exportar PDF
+                          </button>
                         </div>
                       )}
                     </div>
