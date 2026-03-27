@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Search, Trophy, LogOut, Menu, X, Lock, Home } from 'lucide-react'
+import { Search, Trophy, LogOut, Menu, X, Lock, Home, History } from 'lucide-react'
 import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useFiltros } from '@/store/filtros'
@@ -121,8 +121,8 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
         )}
       </div>
 
-      {/* Home button */}
-      <div className="px-4 pt-4 pb-2">
+      {/* Nav buttons */}
+      <div className="px-4 pt-4 pb-2 flex flex-col gap-1">
         <button
           onClick={handleHome}
           className={`w-full flex items-center gap-3 text-left text-sm px-3 py-2.5 rounded-lg transition-colors ${
@@ -133,6 +133,17 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
         >
           <Home size={15} />
           <span>Início</span>
+        </button>
+        <button
+          onClick={() => { router.push('/historico'); if (onFechar) onFechar() }}
+          className={`w-full flex items-center gap-3 text-left text-sm px-3 py-2.5 rounded-lg transition-colors ${
+            pathname === '/historico'
+              ? 'bg-emerald-500/10 text-emerald-400 font-medium'
+              : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900'
+          }`}
+        >
+          <History size={15} />
+          <span>Histórico</span>
         </button>
       </div>
 
