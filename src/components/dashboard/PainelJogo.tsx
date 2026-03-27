@@ -305,6 +305,29 @@ export default function PainelJogo({ jogo }: Props) {
 
       await salvarCache(analiseFormatada)
 
+// 3.5 Criar alertas para mercados com alta confiança
+      const mercadosAlta = ['resultado', 'ambas_marcam', 'total_gols', 'escanteios'] as const
+      for (const mercado of mercadosAlta) {
+        const dados = analiseFormatada[mercado]
+        if (dados?.nivel === 'alta' && dados?.probabilidade >= 75) {
+          await supabase.from('alerts').insert({
+            fixture_id: jogo.id,
+            home_team: jogo.time_casa,
+            away_team: jogo.time_fora,
+            league: jogo.liga,
+            mercado,
+            probabilidade: dados.probabilidade,
+            recomendacao: dados.recomendacao,
+            nivel: 'alta',
+            horario: jogo.horario,
+          }).then(({ error }) => {
+            if (error && !error.message.includes('duplicate')) {
+              console.error('Erro ao criar alerta:', error)
+            }
+          })
+        }
+      }
+
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         await supabase.rpc('incrementar_analise', { uid: user.id })
