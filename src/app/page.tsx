@@ -13,7 +13,7 @@ import { buscarJogosDodia } from '@/lib/api'
 export default function Home() {
   const [jogoSelecionado, setJogoSelecionado] = useState<Jogo | null>(null)
   const [painelMobileAberto, setPainelMobileAberto] = useState(false)
-  const { ligaSelecionada, setJogos, periodo } = useFiltros()
+  const { ligaSelecionada, setJogos, periodo, jogos, jogosFiltrados } = useFiltros()
 
   // Carrega jogos no nível da page — nunca desmonta
   useEffect(() => {
@@ -69,6 +69,11 @@ export default function Home() {
               <p className="text-gray-500 text-sm text-center leading-relaxed mb-8">
                 Selecione uma liga no menu lateral para ver os jogos disponíveis e gerar análises estatísticas com veredito.
               </p>
+              {jogos.length > 0 && jogosFiltrados().length === 0 && (
+                <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-4 w-full text-center mb-4">
+                  <p className="text-gray-500 text-sm">Nenhum jogo nas ligas do seu plano hoje. Volte mais tarde ou confira amanhã.</p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3 w-full">
                 <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-4 text-center">
                   <p className="text-emerald-400 text-2xl font-bold">4</p>
