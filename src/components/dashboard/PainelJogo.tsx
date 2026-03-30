@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Target, Zap, TrendingUp, Flag, ChevronRight, Brain, Swords, Shield, History, Home, Plane, BarChart2, Sparkles, Clock, Lock, Crown } from 'lucide-react'
+import { Target, Zap, TrendingUp, Flag, ChevronRight, Brain, Swords, Shield, History, Home, Plane, BarChart2, Sparkles, Clock, Lock, Crown, Timer } from 'lucide-react'
 import { Jogo } from '@/types'
 import { Drawer, Metrica, Secao } from './Drawer'
 import { supabase } from '@/lib/supabase'
@@ -31,11 +31,26 @@ interface AnaliseCompleta {
   gerada_em?: string
 }
 
+interface AnaliseIntervalo {
+  resultado_final: MercadoAnalise
+  total_gols_2tempo: MercadoAnalise
+  proximo_gol: MercadoAnalise
+  escanteios_2tempo: MercadoAnalise
+  gerada_em?: string
+}
+
 const mercadosConfig = [
   { id: 'resultado', titulo: 'Resultado da partida', icone: Target, cor: 'bg-blue-500/20 text-blue-400', corPonto: 'bg-blue-400' },
   { id: 'ambas_marcam', titulo: 'Ambas marcam', icone: Zap, cor: 'bg-amber-500/20 text-amber-400', corPonto: 'bg-amber-400' },
   { id: 'total_gols', titulo: 'Total de gols', icone: TrendingUp, cor: 'bg-emerald-500/20 text-emerald-400', corPonto: 'bg-emerald-400' },
   { id: 'escanteios', titulo: 'Escanteios', icone: Flag, cor: 'bg-purple-500/20 text-purple-400', corPonto: 'bg-purple-400' },
+]
+
+const mercadosIntervaloConfig = [
+  { id: 'resultado_final', titulo: 'Resultado final', icone: Target, cor: 'bg-blue-500/20 text-blue-400', corPonto: 'bg-blue-400' },
+  { id: 'total_gols_2tempo', titulo: 'Gols no 2º tempo', icone: TrendingUp, cor: 'bg-emerald-500/20 text-emerald-400', corPonto: 'bg-emerald-400' },
+  { id: 'proximo_gol', titulo: 'Próximo gol', icone: Zap, cor: 'bg-amber-500/20 text-amber-400', corPonto: 'bg-amber-400' },
+  { id: 'escanteios_2tempo', titulo: 'Escanteios 2º tempo', icone: Flag, cor: 'bg-purple-500/20 text-purple-400', corPonto: 'bg-purple-400' },
 ]
 
 interface Props {
@@ -232,11 +247,52 @@ function AnaliseEscanteios({ jogo, dados }: { jogo: Jogo; dados: any }) {
   )
 }
 
+function AnaliseIntervaloDetalhe({ dados }: { dados: any }) {
+  if (!dados) return null
+  const entries = Object.entries(dados)
+  return (
+    <>
+      {entries.map(([key, value]) => {
+        if (!value || typeof value !== 'object') {
+          if (typeof value === 'string') {
+            return (
+              <div key={key} className="mb-4">
+                <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+                  <p className="text-gray-300 text-sm leading-relaxed">{value}</p>
+                </div>
+              </div>
+            )
+          }
+          return null
+        }
+        const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+        return (
+          <Secao key={key} icone={Brain} titulo={label}>
+            {Object.entries(value as Record<string, any>).map(([k, v]) => (
+              <Metrica key={k} label={k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} valor={String(v ?? '—')} />
+            ))}
+          </Secao>
+        )
+      })}
+    </>
+  )
+}
+
 export default function PainelJogo({ jogo }: Props) {
+  const router = useRouter()
+  const { sub, planoEfetivo } = useSubscription()
   const [analise, setAnalise] = useState<AnaliseCompleta | null>(null)
+  const [analiseIntervalo, setAnaliseIntervalo] = useState<AnaliseIntervalo | null>(null)
   const [gerando, setGerando] = useState(false)
+  const [gerandoIntervalo, setGerandoIntervalo] = useState(false)
   const [drawerAberto, setDrawerAberto] = useState<string | null>(null)
+  const [drawerIntervaloAberto, setDrawerIntervaloAberto] = useState<string | null>(null)
+
   const mercadoAtivo = mercadosConfig.find(m => m.id === drawerAberto)
+  const mercadoIntervaloAtivo = mercadosIntervaloConfig.find(m => m.id === drawerIntervaloAberto)
+
+  const isPro = sub?.plan === 'pro'
+  const noIntervalo = jogo.status === 'intervalo'
 
   async function verificarCache(): Promise<AnaliseCompleta | null> {
     const hoje = new Date().toISOString().split('T')[0]
@@ -305,19 +361,18 @@ export default function PainelJogo({ jogo }: Props) {
 
       await salvarCache(analiseFormatada)
 
-// 3.5 Criar alertas para mercados com alta confiança
       const mercadosAlta = ['resultado', 'ambas_marcam', 'total_gols', 'escanteios'] as const
       for (const mercado of mercadosAlta) {
-        const dados = analiseFormatada[mercado]
-        if (dados?.nivel === 'alta' && dados?.probabilidade >= 75) {
+        const d = analiseFormatada[mercado]
+        if (d?.nivel === 'alta' && d?.probabilidade >= 75) {
           await supabase.from('alerts').insert({
             fixture_id: jogo.id,
             home_team: jogo.time_casa,
             away_team: jogo.time_fora,
             league: jogo.liga,
             mercado,
-            probabilidade: dados.probabilidade,
-            recomendacao: dados.recomendacao,
+            probabilidade: d.probabilidade,
+            recomendacao: d.recomendacao,
             nivel: 'alta',
             horario: jogo.horario,
           }).then(({ error }) => {
@@ -337,7 +392,7 @@ export default function PainelJogo({ jogo }: Props) {
           league: jogo.liga,
           home_team: jogo.time_casa,
           away_team: jogo.time_fora,
-          plan_at_time: 'trial',
+          plan_at_time: sub?.plan || 'trial',
         })
       }
 
@@ -346,6 +401,53 @@ export default function PainelJogo({ jogo }: Props) {
       console.error('Erro ao gerar análise:', err)
     } finally {
       setGerando(false)
+    }
+  }
+
+  async function gerarAnaliseIntervalo() {
+    if (!isPro) {
+      router.push('/planos')
+      return
+    }
+
+    setGerandoIntervalo(true)
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_N8N_URL}/analise-intervalo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fixture_id: jogo.id }),
+      })
+
+      if (!response.ok) throw new Error('Erro ao buscar análise de intervalo')
+
+      const dados = await response.json()
+      const formatada: AnaliseIntervalo = {
+        resultado_final: dados.mercados.resultado_final,
+        total_gols_2tempo: dados.mercados.total_gols_2tempo,
+        proximo_gol: dados.mercados.proximo_gol,
+        escanteios_2tempo: dados.mercados.escanteios_2tempo,
+        gerada_em: new Date().toISOString(),
+      }
+
+      // Incrementar crédito
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await supabase.rpc('incrementar_analise', { uid: user.id })
+        await supabase.from('analysis_log').insert({
+          user_id: user.id,
+          fixture_id: jogo.id,
+          league: jogo.liga,
+          home_team: jogo.time_casa,
+          away_team: jogo.time_fora,
+          plan_at_time: 'pro',
+        })
+      }
+
+      setAnaliseIntervalo(formatada)
+    } catch (err) {
+      console.error('Erro ao gerar análise de intervalo:', err)
+    } finally {
+      setGerandoIntervalo(false)
     }
   }
 
@@ -371,10 +473,22 @@ export default function PainelJogo({ jogo }: Props) {
       >
         <div className="flex items-center justify-between mb-1">
           <span className="text-gray-500 text-xs uppercase tracking-wider">{jogo.liga}</span>
-          <span className="flex items-center gap-1.5 text-blue-400 text-xs bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-full">
-            <Clock size={10} />
-            Análise pré-jogo
-          </span>
+          {noIntervalo ? (
+            <span className="flex items-center gap-1.5 text-amber-400 text-xs bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full">
+              <Timer size={10} />
+              Intervalo
+            </span>
+          ) : jogo.status === 'ao_vivo' ? (
+            <span className="flex items-center gap-1.5 text-red-400 text-xs bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded-full">
+              <Zap size={10} className="fill-red-400" />
+              Ao vivo
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 text-blue-400 text-xs bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-full">
+              <Clock size={10} />
+              Análise pré-jogo
+            </span>
+          )}
         </div>
         <div className="flex items-center justify-between mt-3">
           <div className="flex-1">
@@ -382,8 +496,17 @@ export default function PainelJogo({ jogo }: Props) {
             <p className="text-gray-500 text-sm mt-0.5">Mandante</p>
           </div>
           <div className="flex flex-col items-center px-6">
-            <span className="text-gray-600 text-2xl font-light">×</span>
-            <span className="text-gray-600 text-xs mt-1">{jogo.horario}</span>
+            {(jogo.placar_casa != null && jogo.placar_fora != null) ? (
+              <>
+                <span className="text-white text-2xl font-bold">{jogo.placar_casa} — {jogo.placar_fora}</span>
+                <span className="text-gray-600 text-xs mt-1">{jogo.horario}</span>
+              </>
+            ) : (
+              <>
+                <span className="text-gray-600 text-2xl font-light">×</span>
+                <span className="text-gray-600 text-xs mt-1">{jogo.horario}</span>
+              </>
+            )}
           </div>
           <div className="flex-1 text-right">
             <p className="text-white text-xl font-bold">{jogo.time_fora}</p>
@@ -394,7 +517,7 @@ export default function PainelJogo({ jogo }: Props) {
         {analise?.gerada_em && (
           <div className="mt-3 pt-3 border-t border-gray-800">
             <p className="text-gray-600 text-xs">
-              Análise gerada às {new Date(analise.gerada_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+              Análise pré-jogo gerada às {new Date(analise.gerada_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
             </p>
           </div>
         )}
@@ -477,7 +600,127 @@ export default function PainelJogo({ jogo }: Props) {
         </div>
       )}
 
-      {/* Drawer */}
+      {/* Análise de intervalo — CTA */}
+      {noIntervalo && analise && !analiseIntervalo && !gerandoIntervalo && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-4 bg-amber-500/5 border border-amber-500/20 rounded-2xl p-5"
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <Timer size={16} className="text-amber-400" />
+            <span className="text-white font-semibold text-sm">Análise de intervalo</span>
+            {!isPro && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">
+                PRO
+              </span>
+            )}
+          </div>
+          <p className="text-gray-500 text-sm mb-4">
+            Gere uma análise baseada nos dados do 1º tempo para identificar oportunidades no 2º tempo.
+          </p>
+          <button
+            onClick={gerarAnaliseIntervalo}
+            className={`flex items-center gap-2 font-bold text-sm px-6 py-3 rounded-xl transition-colors ${
+              isPro
+                ? 'bg-amber-500 hover:bg-amber-400 text-gray-950'
+                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+            }`}
+          >
+            <Timer size={16} />
+            {isPro ? 'Gerar análise do intervalo' : 'Disponível no plano Pro'}
+          </button>
+          {isPro && <p className="text-gray-600 text-xs mt-3">Consome 1 crédito de análise</p>}
+        </motion.div>
+      )}
+
+      {/* Gerando análise de intervalo */}
+      {gerandoIntervalo && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="mt-4 flex flex-col items-center justify-center py-12 bg-amber-500/5 rounded-2xl border border-amber-500/20"
+        >
+          <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-4">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
+            >
+              <Timer size={24} className="text-amber-400" />
+            </motion.div>
+          </div>
+          <h3 className="text-white font-semibold text-base mb-1">Analisando o 1º tempo...</h3>
+          <p className="text-gray-500 text-sm">Processando estatísticas e eventos</p>
+        </motion.div>
+      )}
+
+      {/* Resultado da análise de intervalo */}
+      {analiseIntervalo && !gerandoIntervalo && (
+        <div className="mt-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Timer size={14} className="text-amber-400" />
+            <span className="text-amber-400 text-xs uppercase tracking-wider font-medium">Análise do intervalo</span>
+            <div className="flex-1 h-px bg-amber-500/20" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            {mercadosIntervaloConfig.map((mercado, i) => {
+              const dados = (analiseIntervalo as any)[mercado.id] as MercadoAnalise
+              if (!dados) return null
+              return (
+                <motion.button
+                  key={mercado.id}
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: i * 0.06 }}
+                  onClick={() => setDrawerIntervaloAberto(mercado.id)}
+                  className="bg-gray-900/80 border border-amber-500/10 rounded-2xl p-5 hover:border-amber-500/30 transition-all text-left group hover:bg-gray-900 active:scale-[0.99]"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${mercado.cor}`}>
+                        <mercado.icone size={14} />
+                      </div>
+                      <span className="text-gray-300 text-sm font-medium">{mercado.titulo}</span>
+                    </div>
+                    <ChevronRight size={14} className="text-gray-700 group-hover:text-gray-500 transition-colors" />
+                  </div>
+
+                  <div className="mb-3">
+                    <div className="flex items-end gap-1 mb-2">
+                      <span className="text-white text-4xl font-bold leading-none">
+                        {dados?.probabilidade != null ? `${dados.probabilidade}%` : '—'}
+                      </span>
+                    </div>
+                    <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${dados?.probabilidade ?? 0}%` }}
+                        transition={{ duration: 0.8, delay: i * 0.06 + 0.2, ease: 'easeOut' }}
+                        className={`h-full rounded-full ${
+                          dados?.nivel === 'alta' ? 'bg-emerald-500' :
+                          dados?.nivel === 'media' ? 'bg-amber-500' : 'bg-red-500'
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  <span className={`inline-flex items-center text-xs px-2.5 py-1 rounded-full border font-medium ${nivelCor[dados?.nivel ?? 'baixa']}`}>
+                    {dados?.recomendacao ?? '—'}
+                  </span>
+                </motion.button>
+              )
+            })}
+          </div>
+
+          {analiseIntervalo.gerada_em && (
+            <p className="text-gray-600 text-xs mt-3">
+              Análise de intervalo gerada às {new Date(analiseIntervalo.gerada_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Drawer pré-jogo */}
       <Drawer
         aberto={!!drawerAberto}
         onFechar={() => setDrawerAberto(null)}
@@ -496,6 +739,29 @@ export default function PainelJogo({ jogo }: Props) {
               </span>
             </div>
             {renderAnalise()}
+          </div>
+        )}
+      </Drawer>
+
+      {/* Drawer intervalo */}
+      <Drawer
+        aberto={!!drawerIntervaloAberto}
+        onFechar={() => setDrawerIntervaloAberto(null)}
+        titulo={mercadoIntervaloAtivo?.titulo ?? ''}
+        cor={mercadoIntervaloAtivo?.corPonto ?? ''}
+      >
+        {mercadoIntervaloAtivo && analiseIntervalo && (
+          <div>
+            <div className="bg-gray-900 rounded-2xl p-5 mb-6 text-center border border-gray-800">
+              <p className="text-gray-500 text-sm mb-1">Probabilidade — 2º tempo</p>
+              <p className="text-white text-6xl font-bold">
+                {(analiseIntervalo as any)[drawerIntervaloAberto!]?.probabilidade}%
+              </p>
+              <span className={`inline-flex items-center text-xs px-3 py-1 rounded-full border font-medium mt-3 ${nivelCor[(analiseIntervalo as any)[drawerIntervaloAberto!]?.nivel ?? 'baixa']}`}>
+                {(analiseIntervalo as any)[drawerIntervaloAberto!]?.recomendacao}
+              </span>
+            </div>
+            <AnaliseIntervaloDetalhe dados={(analiseIntervalo as any)[drawerIntervaloAberto!]?.analise} />
           </div>
         )}
       </Drawer>

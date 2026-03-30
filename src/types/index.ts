@@ -5,7 +5,9 @@ export interface Jogo {
   time_fora: string
   horario: string
   liga: string
-  status: 'agendado' | 'ao_vivo' | 'encerrado'
+  status: 'agendado' | 'ao_vivo' | 'intervalo' | 'encerrado'
+  placar_casa?: number | null
+  placar_fora?: number | null
   logo_casa?: string
   logo_fora?: string
 }
