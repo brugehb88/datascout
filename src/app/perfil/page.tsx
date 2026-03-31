@@ -176,6 +176,20 @@ export default function PerfilPage() {
             className="w-full bg-gray-900 hover:bg-gray-800 border border-gray-800 text-gray-300 text-sm py-3 rounded-xl transition-colors"
           >
             Gerenciar assinatura
+            <button
+            onClick={async () => {
+              try {
+                const res = await fetch('/api/stripe/portal', { method: 'POST' })
+                const data = await res.json()
+                if (data.url) window.location.href = data.url
+              } catch (err) {
+                console.error('Erro ao abrir portal:', err)
+              }
+            }}
+            className="w-full bg-gray-900 hover:bg-gray-800 border border-gray-800 text-gray-300 text-sm py-3 rounded-xl transition-colors"
+          >
+            Gerenciar assinatura
+          </button>
           </button>
           )}
         </div>
