@@ -88,11 +88,22 @@ export default function PlanosPage() {
     if (!user || processando) return
     setProcessando(true)
 
-    const planoConfig = planos.find(p => p.id === planoId)
-    const priceId = planoConfig?.priceId
-
     try {
+      // Se já tem assinatura ativa, redireciona pro portal do Stripe
+      if (sub?.stripe_subscription_id) {
+        const response = await fetch('/api/stripe/portal', { method: 'POST' })
+        const data = await response.json()
+        if (data.url) {
+          window.location.href = data.url
+          return
+        }
+      }
+
+      // Senão, cria novo checkout
+      const planoConfig = planos.find(p => p.id === planoId)
+      const priceId = planoConfig?.priceId
       const skipTrial = sub?.status === 'trialing'
+
       const response = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -110,16 +121,6 @@ export default function PlanosPage() {
     } finally {
       setProcessando(false)
     }
-  }
-
-  if (authLoading || loading) {
-    return (
-      <MainLayout>
-        <div className="flex items-center justify-center py-20">
-          <p className="text-gray-500 text-sm">Carregando...</p>
-        </div>
-      </MainLayout>
-    )
   }
 
   // Determinar plano efetivo do usuário
