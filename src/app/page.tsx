@@ -86,7 +86,7 @@ export default function Home() {
               </div>
             </div>
           ) : jogoSelecionado ? (
-            <PainelJogo jogo={jogoSelecionado} />
+            <PainelJogo key={jogoSelecionado.id} jogo={jogoSelecionado} />
           ) : (
             <div className="flex flex-col items-center justify-center h-64 bg-gray-900/30 rounded-2xl border border-dashed border-gray-800 mt-12">
               <Target className="text-gray-700 mb-3" size={32} />
@@ -130,7 +130,7 @@ export default function Home() {
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto px-4 py-4">
-                <PainelJogo jogo={jogoSelecionado} />
+                <PainelJogo key={jogoSelecionado.id} jogo={jogoSelecionado} />
               </div>
             </motion.div>
           </>
