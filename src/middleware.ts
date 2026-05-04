@@ -5,13 +5,11 @@ export async function middleware(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-  // Se não tem variáveis, deixa passar sem bloquear
   if (!supabaseUrl || !supabaseKey) {
     return NextResponse.next()
   }
 
   let supabaseResponse = NextResponse.next({ request })
-
   const supabase = createServerClient(supabaseUrl, supabaseKey, {
     cookies: {
       getAll() {
@@ -32,19 +30,20 @@ export async function middleware(request: NextRequest) {
   try {
     const { data: { user } } = await supabase.auth.getUser()
 
-    if (!user && !request.nextUrl.pathname.startsWith('/login') && request.nextUrl.pathname !== '/' && !request.nextUrl.pathname.startsWith('/planos')) {
+    // Proteção: /app/* só para autenticados
+    if (!user && request.nextUrl.pathname.startsWith('/app')) {
       const url = request.nextUrl.clone()
       url.pathname = '/login'
       return NextResponse.redirect(url)
     }
 
+    // Se autenticado e tentar acessar /login, vai para /app
     if (user && request.nextUrl.pathname.startsWith('/login')) {
       const url = request.nextUrl.clone()
-      url.pathname = '/'
+      url.pathname = '/app/historico'
       return NextResponse.redirect(url)
     }
   } catch {
-    // Se falhar autenticação, deixa passar
     return NextResponse.next()
   }
 
