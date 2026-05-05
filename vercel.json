@@ -1,21 +1,8 @@
 {
-  "buildCommand": "next build",
-  "outputDirectory": ".next",
-  "env": {
-    "NODE_ENV": "production"
-  },
   "functions": {
-    "api/**/*.ts": {
+    "src/app/api/**/*.ts": {
       "memory": 1024,
       "maxDuration": 30
-    }
-  },
-  "regions": [
-    "gru1"
-  ],
-  "git": {
-    "deploymentEnabled": {
-      "main": true
     }
   }
 }
