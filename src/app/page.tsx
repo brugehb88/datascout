@@ -98,11 +98,11 @@ const PLANS = [
     name: "Starter",
     price: "47",
     period: "/mês",
-    description: "Para quem quer começar a apostar com inteligência.",
+    description: "Ideal pra quem quer começar com análises sólidas nas ligas principais.",
     features: [
-      "Análise pré-jogo das principais ligas",
-      "Probabilidades calculadas",
-      "Histórico básico de confrontos",
+      "30 análises pré-jogo por mês",
+      "10 ligas principais (BR + Europa top 5)",
+      "Veredito estatístico potencializado por IA",
       "Suporte por e-mail",
     ],
     cta: "Começar com Starter",
@@ -112,13 +112,14 @@ const PLANS = [
     name: "Pro",
     price: "97",
     period: "/mês",
-    description: "Para quem quer dominar o intervalo e maximizar acertos.",
+    description: "Pra quem leva a sério. Todas as ligas, histórico e análise de intervalo.",
     features: [
-      "Tudo do Starter, e mais:",
-      "Análise no intervalo (meio-tempo)",
-      "Dados em tempo real durante a partida",
-      "Histórico completo + tendências",
-      "Análise de mercados específicos (escanteios, cartões)",
+      "150 análises pré-jogo por mês",
+      "20+ ligas (todas disponíveis)",
+      "Análise de intervalo (halftime) — EXCLUSIVO",
+      "Histórico completo de análises",
+      "Exportar análises em PDF",
+      "Alertas de jogos com alta confiança",
       "Suporte prioritário no WhatsApp",
     ],
     cta: "Quero o Pro",
@@ -194,7 +195,7 @@ function Header() {
             Entrar
           </Link>
           <Link
-            href="/planos"
+            href="/checkout?plan=pro"
             className="bg-[#00C853] hover:bg-[#00E676] text-black font-bold text-sm px-5 py-2.5 transition-all hover:scale-105"
           >
             Começar agora
@@ -253,7 +254,7 @@ function Hero() {
 
           <div className="flex flex-col sm:flex-row gap-4 mb-8">
             <Link
-              href="/planos"
+              href="/checkout?plan=pro"
               className="group bg-[#00C853] hover:bg-[#00E676] text-black font-bold px-8 py-4 transition-all hover:scale-105 flex items-center justify-center gap-2"
             >
               Começar agora
@@ -267,7 +268,11 @@ function Hero() {
             </a>
           </div>
 
-          <div className="flex items-center gap-6 text-sm text-white/50">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-white/50">
+            <div className="flex items-center gap-2">
+              <Check className="w-4 h-4 text-[#00C853]" />
+              <span><strong className="text-white">7 dias grátis</strong> · 3 análises de teste</span>
+            </div>
             <div className="flex items-center gap-2">
               <Check className="w-4 h-4 text-[#00C853]" />
               Sem fidelidade
@@ -595,7 +600,7 @@ function HalfTimeFeature() {
           </ul>
 
           <Link
-            href="/planos"
+            href="/checkout?plan=pro"
             className="inline-flex items-center gap-2 bg-[#00C853] hover:bg-[#00E676] text-black font-bold px-8 py-4 transition-all hover:scale-105"
           >
             Quero o plano Pro
@@ -728,7 +733,7 @@ function Pricing() {
   return (
     <section id="pricing" className="py-24 bg-black border-t border-white/5">
       <div className="max-w-6xl mx-auto px-6">
-        <div className="text-center mb-16">
+        <div className="text-center mb-12">
           <span className="text-[#00C853] text-sm font-bold tracking-widest uppercase mb-4 block">
             Planos
           </span>
@@ -740,6 +745,25 @@ function Pricing() {
           <p className="text-white/60 text-lg">
             Sem fidelidade. Cancele quando quiser. Sem letras miúdas.
           </p>
+        </div>
+
+        {/* Banner Trial Grátis */}
+        <div className="max-w-4xl mx-auto mb-10">
+          <div className="bg-gradient-to-r from-[#00C853]/20 via-[#00C853]/10 to-[#00C853]/20 border border-[#00C853]/40 p-5 text-center">
+            <div className="inline-flex items-center gap-2 mb-2">
+              <Sparkles className="w-5 h-5 text-[#00C853]" />
+              <span className="text-[#00C853] font-black text-sm tracking-widest">
+                7 DIAS GRÁTIS
+              </span>
+              <Sparkles className="w-5 h-5 text-[#00C853]" />
+            </div>
+            <p className="text-white text-lg font-bold">
+              Teste com <span className="text-[#00C853]">3 análises grátis</span> antes de pagar qualquer centavo
+            </p>
+            <p className="text-white/60 text-sm mt-1">
+              Sem cobrança no cadastro · Cancele a qualquer momento
+            </p>
+          </div>
         </div>
 
         <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
@@ -786,7 +810,7 @@ function Pricing() {
               </ul>
 
               <Link
-                href="/planos"
+                href={`/checkout?plan=${plan.name.toLowerCase()}`}
                 className={`block text-center font-bold py-4 transition-all ${
                   plan.highlight
                     ? "bg-[#00C853] hover:bg-[#00E676] text-black hover:scale-105"
@@ -871,7 +895,7 @@ function FinalCTA() {
         </p>
 
         <Link
-          href="/planos"
+          href="/checkout?plan=pro"
           className="inline-flex items-center gap-3 bg-[#00C853] hover:bg-[#00E676] text-black font-black text-lg px-10 py-5 transition-all hover:scale-105"
         >
           Começar agora
