@@ -19,17 +19,15 @@ export async function POST(request: NextRequest) {
     }
 
     const origin =
-      request.headers.get('origin') || 'https://app.datascout.com.br'
+      request.headers.get('origin') || 'https://datascout.com.br'
 
-    // Criar checkout session SEM customer pré-existente
-    // Stripe vai coletar o email no próprio checkout
+    // Criar checkout session em modo subscription
+    // No modo subscription, o customer é criado automaticamente
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
       // Se já temos email (vem do form de pré-checkout), pré-preenche
       ...(email && { customer_email: email }),
-      // Para coletar email se não tiver
-      ...(!email && { customer_creation: 'always' }),
       success_url: `${origin}/checkout/sucesso?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/checkout?plan=${planId}&canceled=true`,
       // Trial de 7 dias - aumenta conversão
