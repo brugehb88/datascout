@@ -11,7 +11,7 @@
     }
   },
   "regions": [
-    "sao1"
+    "gru1"
   ],
   "git": {
     "deploymentEnabled": {
