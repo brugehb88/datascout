@@ -110,36 +110,39 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   try {
     // 1. Verificar se o usuário já existe
-    const { data: existingUsers } = await supabase.auth.admin.listUsers();
-    const existingUser = existingUsers?.users?.find(
-      (u) => u.email === customerEmail
+    const { data: existingUsersData } = await supabase.auth.admin.listUsers();
+    const existingUser = existingUsersData.users.find(
+      (u: { email?: string }) => u.email === customerEmail
     );
 
     let userId: string;
+    let isNewUser = false;
 
     if (existingUser) {
-      // Usuário já existe - apenas atualiza
       console.log(`👤 User already exists: ${existingUser.id}`);
       userId = existingUser.id;
     } else {
-      // 2. Criar novo usuário no Supabase Auth
-      const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
-        email: customerEmail,
-        email_confirm: true, // Já considera o email confirmado
-        user_metadata: {
-          plan_id: planId,
-          stripe_customer_id: customerId,
-          source: "checkout_public",
-        },
-      });
+      // 2. Criar novo usuário no Supabase Auth E ENVIAR EMAIL DE CONVITE
+      const { data: newUser, error: createError } = await supabase.auth.admin.inviteUserByEmail(
+        customerEmail,
+        {
+          data: {
+            plan_id: planId,
+            stripe_customer_id: customerId,
+            source: "checkout_public",
+          },
+          redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || "https://datascout.com.br"}/auth/callback`,
+        }
+      );
 
       if (createError) {
-        console.error("❌ Error creating user:", createError);
+        console.error("❌ Error inviting user:", createError);
         throw createError;
       }
 
       userId = newUser.user!.id;
-      console.log(`✨ New user created: ${userId}`);
+      isNewUser = true;
+      console.log(`✨ New user invited: ${userId} - Email enviado!`);
     }
 
     // 3. Criar/atualizar registro de subscription no banco
@@ -161,19 +164,20 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       console.error("⚠️ Error saving subscription:", subError);
     }
 
-    // 4. Enviar email mágico (Magic Link) para o cliente
-    const { error: emailError } = await supabase.auth.admin.generateLink({
-      type: "magiclink",
-      email: customerEmail,
-      options: {
-        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || "https://datascout.com.br"}/auth/callback`,
-      },
-    });
+    // 4. Para usuários existentes, envia magic link
+    if (!isNewUser) {
+      const { error: magicLinkError } = await supabase.auth.signInWithOtp({
+        email: customerEmail,
+        options: {
+          emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || "https://datascout.com.br"}/auth/callback`,
+        },
+      });
 
-    if (emailError) {
-      console.error("⚠️ Error generating magic link:", emailError);
-    } else {
-      console.log(`✉️ Magic link sent to: ${customerEmail}`);
+      if (magicLinkError) {
+        console.error("⚠️ Error sending magic link:", magicLinkError);
+      } else {
+        console.log(`✉️ Magic link sent to existing user: ${customerEmail}`);
+      }
     }
   } catch (error) {
     console.error("❌ Error in handleCheckoutCompleted:", error);
