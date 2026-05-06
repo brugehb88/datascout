@@ -2,56 +2,71 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { useRouter } from "next/navigation";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 
 function SuccessContent() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const sessionId = searchParams.get("session_id");
   const [status, setStatus] = useState<"loading" | "success" | "error">(
     "loading"
   );
 
   useEffect(() => {
-    const checkAndRedirect = async () => {
+    const processSuccess = async () => {
       if (!sessionId) {
         setStatus("error");
         return;
       }
 
       // Pequeno delay para o webhook processar
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 1500));
 
       try {
-        const supabase = createBrowserClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        );
+        // Pega credenciais salvas no sessionStorage
+        const email = sessionStorage.getItem("pending_login_email");
+        const password = sessionStorage.getItem("pending_login_password");
 
-        // Verifica se está logado
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
+        if (email && password) {
+          // Faz login no browser para criar sessão
+          const supabase = createBrowserClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+          );
 
-        if (user) {
+          const { error: signInError } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+
+          // Limpa credenciais do sessionStorage
+          sessionStorage.removeItem("pending_login_email");
+          sessionStorage.removeItem("pending_login_password");
+
+          if (signInError) {
+            console.error("Auto-login error:", signInError);
+            setStatus("error");
+            return;
+          }
+
           setStatus("success");
-          // Redireciona para dashboard após 2 segundos
+
+          // Aguarda 1.5s e redireciona para o subdomínio app
           setTimeout(() => {
             window.location.href = "https://app.datascout.com.br/";
-          }, 2000);
+          }, 1500);
         } else {
+          // Sem credenciais salvas, manda pra login
           setStatus("error");
         }
       } catch (err) {
-        console.error("Error checking auth:", err);
+        console.error("Error:", err);
         setStatus("error");
       }
     };
 
-    checkAndRedirect();
-  }, [sessionId, router]);
+    processSuccess();
+  }, [sessionId]);
 
   return (
     <div className="min-h-screen bg-black text-white flex items-center justify-center px-6 py-12">
@@ -115,7 +130,7 @@ function SuccessContent() {
               Sua assinatura foi criada com sucesso. Faça login para acessar.
             </p>
             <a
-              href="/login"
+              href="https://app.datascout.com.br/login"
               className="inline-block bg-[#00C853] hover:bg-[#00E676] text-black font-black px-8 py-4 rounded transition"
             >
               Fazer login →

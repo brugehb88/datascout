@@ -110,7 +110,7 @@ function CheckoutContent() {
     setLoading(true);
 
     try {
-      // 1. Cria conta + checkout session
+      // Cria conta + checkout session
       const response = await fetch("/api/auth/signup-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -138,24 +138,14 @@ function CheckoutContent() {
         return;
       }
 
-      // 2. Faz login no browser ANTES de redirecionar pro Stripe
-      // Assim, quando voltar, já está autenticado
-      const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      );
-
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (signInError) {
-        console.error("Erro no auto-login:", signInError);
-        // Não bloqueia, segue pro Stripe mesmo
+      // Salva email + senha temporariamente no sessionStorage
+      // para auto-login após retorno do Stripe
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("pending_login_email", email);
+        sessionStorage.setItem("pending_login_password", password);
       }
 
-      // 3. Redireciona para Stripe Checkout
+      // Redireciona para Stripe Checkout
       window.location.href = data.url;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Erro desconhecido";

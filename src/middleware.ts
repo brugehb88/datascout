@@ -23,22 +23,23 @@ export async function middleware(request: NextRequest) {
           request.cookies.set(name, value)
         )
         supabaseResponse = NextResponse.next({ request })
-        cookiesToSet.forEach(({ name, value, options }) =>
-          supabaseResponse.cookies.set(name, value, options)
-        )
+        cookiesToSet.forEach(({ name, value, options }) => {
+          // Domínio compartilhado entre datascout.com.br e app.datascout.com.br
+          const isProduction = hostname.includes('datascout.com.br')
+          const cookieOptions = isProduction
+            ? { ...options, domain: '.datascout.com.br' }
+            : options
+          supabaseResponse.cookies.set(name, value, cookieOptions)
+        })
       },
     },
   })
 
   try {
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     const path = request.nextUrl.pathname
-
-    // Rotas públicas (LP, login, planos, checkout, auth callback)
-    const publicPaths = ['/', '/login', '/planos', '/checkout', '/auth']
-    const isPublicPath = publicPaths.some(p => 
-      p === '/' ? path === '/' : path.startsWith(p)
-    )
 
     // Subdomínio app: redireciona raiz para /historico se logado, /login se não
     if (isAppSubdomain && path === '/') {
