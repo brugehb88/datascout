@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { createBrowserClient } from "@supabase/ssr";
 import {
   Check,
   Lock,
@@ -11,21 +12,22 @@ import {
   CreditCard,
   ArrowLeft,
   Star,
-  TrendingUp,
   AlertCircle,
+  Eye,
+  EyeOff,
+  Loader2,
 } from "lucide-react";
-
-// =============================================================================
-// PLANOS - Mesma estrutura da LP
-// =============================================================================
 
 const PLANS = {
   starter: {
     id: "starter",
     name: "Starter",
     price: 47,
-    priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_STARTER || "price_1TFLpwRpq7vHDxvseVlcf6n5",
-    description: "Ideal pra quem quer começar com análises sólidas nas ligas principais.",
+    priceId:
+      process.env.NEXT_PUBLIC_STRIPE_PRICE_STARTER ||
+      "price_1TFLpwRpq7vHDxvseVlcf6n5",
+    description:
+      "Ideal pra quem quer começar com análises sólidas nas ligas principais.",
     features: [
       "30 análises pré-jogo por mês",
       "10 ligas principais (BR + Europa top 5)",
@@ -37,8 +39,11 @@ const PLANS = {
     id: "pro",
     name: "Pro",
     price: 97,
-    priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO || "price_1TFLq9Rpq7vHDxvs6WHcjCIf",
-    description: "Pra quem leva a sério. Todas as ligas, histórico e análise de intervalo.",
+    priceId:
+      process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO ||
+      "price_1TFLq9Rpq7vHDxvs6WHcjCIf",
+    description:
+      "Pra quem leva a sério. Todas as ligas, histórico e análise de intervalo.",
     features: [
       "150 análises pré-jogo por mês",
       "20+ ligas (todas disponíveis)",
@@ -52,10 +57,6 @@ const PLANS = {
   },
 };
 
-// =============================================================================
-// TRUST BADGES
-// =============================================================================
-
 const TRUST_BADGES = [
   { icon: Lock, label: "Pagamento Seguro" },
   { icon: Shield, label: "Stripe Encryption" },
@@ -63,36 +64,61 @@ const TRUST_BADGES = [
   { icon: CreditCard, label: "Cancele Quando Quiser" },
 ];
 
-// =============================================================================
-// CHECKOUT FORM
-// =============================================================================
-
 function CheckoutContent() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const planId = (searchParams.get("plan") || "pro") as "starter" | "pro";
   const canceled = searchParams.get("canceled") === "true";
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    canceled ? "Pagamento cancelado. Você não foi cobrado." : null
+  );
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Form state
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
 
   const plan = PLANS[planId] || PLANS.pro;
 
-  useEffect(() => {
-    if (canceled) {
-      setError("Pagamento cancelado. Tudo certo, você não foi cobrado.");
-    }
-  }, [canceled]);
+  const formatWhatsapp = (value: string) => {
+    const digits = value.replace(/\D/g, "");
+    if (digits.length <= 2) return `(${digits}`;
+    if (digits.length <= 7)
+      return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+    if (digits.length <= 11)
+      return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`;
+  };
 
-  const handleCheckout = async () => {
-    setLoading(true);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError(null);
 
+    if (!email || !password) {
+      setError("Preencha email e senha para continuar.");
+      return;
+    }
+
+    if (password.length < 6) {
+      setError("A senha deve ter no mínimo 6 caracteres.");
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      const response = await fetch("/api/stripe/checkout-public", {
+      // 1. Cria conta + checkout session
+      const response = await fetch("/api/auth/signup-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          email,
+          password,
+          fullName: fullName || null,
+          whatsapp: whatsapp.replace(/\D/g, "") || null,
           priceId: plan.priceId,
           planId: plan.id,
         }),
@@ -101,10 +127,35 @@ function CheckoutContent() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Erro ao criar checkout");
+        if (data.code === "user_exists") {
+          setError(
+            "Este e-mail já está cadastrado. Faça login para continuar."
+          );
+        } else {
+          throw new Error(data.error || "Erro ao processar cadastro");
+        }
+        setLoading(false);
+        return;
       }
 
-      // Redireciona para Stripe Checkout
+      // 2. Faz login no browser ANTES de redirecionar pro Stripe
+      // Assim, quando voltar, já está autenticado
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signInError) {
+        console.error("Erro no auto-login:", signInError);
+        // Não bloqueia, segue pro Stripe mesmo
+      }
+
+      // 3. Redireciona para Stripe Checkout
       window.location.href = data.url;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Erro desconhecido";
@@ -115,7 +166,7 @@ function CheckoutContent() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* Header simples */}
+      {/* Header */}
       <header className="border-b border-white/5 bg-black/80 backdrop-blur-lg sticky top-0 z-40">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link
@@ -150,14 +201,14 @@ function CheckoutContent() {
               <div className="w-6 h-6 rounded-full bg-[#00C853] text-black flex items-center justify-center text-xs font-black">
                 1
               </div>
-              <span className="font-bold">Plano</span>
+              <span className="font-bold">Cadastro</span>
             </div>
             <div className="w-12 h-px bg-[#00C853]" />
-            <div className="flex items-center gap-2 text-[#00C853]">
-              <div className="w-6 h-6 rounded-full bg-[#00C853] text-black flex items-center justify-center text-xs font-black">
+            <div className="flex items-center gap-2 text-white/40">
+              <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-xs font-black">
                 2
               </div>
-              <span className="font-bold">Pagamento</span>
+              <span>Pagamento</span>
             </div>
             <div className="w-12 h-px bg-white/10" />
             <div className="flex items-center gap-2 text-white/40">
@@ -170,20 +221,18 @@ function CheckoutContent() {
         </div>
 
         <div className="grid lg:grid-cols-5 gap-8">
-          {/* COLUNA ESQUERDA - Resumo do plano (3/5) */}
-          <div className="lg:col-span-3 space-y-6">
+          {/* COLUNA ESQUERDA - Plano (2/5) */}
+          <div className="lg:col-span-2 space-y-6">
             <div>
               <h1 className="text-3xl md:text-4xl font-black mb-2">
-                Você está a um passo
-                <br />
-                de <span className="text-[#00C853]">apostar com inteligência</span>.
+                Crie sua conta
+                <br />e <span className="text-[#00C853]">comece grátis</span>.
               </h1>
               <p className="text-white/60">
-                Confira seu plano e finalize a assinatura abaixo.
+                7 dias de trial. Sem cobrança hoje.
               </p>
             </div>
 
-            {/* Card do plano selecionado */}
             <div
               className={`p-6 rounded-lg border ${
                 plan.highlight
@@ -191,30 +240,25 @@ function CheckoutContent() {
                   : "bg-zinc-950 border-white/10"
               }`}
             >
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <h2 className="text-2xl font-black">Plano {plan.name}</h2>
+              <div className="flex items-start justify-between mb-4 gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <h2 className="text-xl font-black">Plano {plan.name}</h2>
                     {plan.highlight && (
                       <span className="bg-[#00C853] text-black text-xs font-black px-2 py-0.5">
                         MAIS ESCOLHIDO
                       </span>
                     )}
                   </div>
-                  <p className="text-white/60 text-sm">{plan.description}</p>
+                  <p className="text-white/60 text-xs">{plan.description}</p>
                 </div>
-                <div className="text-right">
-                  <div className="text-3xl font-black">
-                    R$ {plan.price}
-                  </div>
-                  <div className="text-white/40 text-sm">/mês</div>
+                <div className="text-right flex-shrink-0 whitespace-nowrap">
+                  <div className="text-2xl font-black">R$ {plan.price}</div>
+                  <div className="text-white/40 text-xs">/mês</div>
                 </div>
               </div>
 
               <div className="border-t border-white/5 pt-4">
-                <div className="text-sm text-white/60 mb-3 font-medium">
-                  Incluído no plano:
-                </div>
                 <ul className="space-y-2">
                   {plan.features.map((feature) => (
                     <li
@@ -229,7 +273,6 @@ function CheckoutContent() {
               </div>
             </div>
 
-            {/* Trocar de plano */}
             {planId === "pro" ? (
               <Link
                 href="/checkout?plan=starter"
@@ -242,207 +285,220 @@ function CheckoutContent() {
                 href="/checkout?plan=pro"
                 className="block text-center text-sm text-[#00C853] hover:text-[#00E676] font-bold transition"
               >
-                ⬆ Upgrade para Pro (R$ 97/mês) — Recomendado
+                ⬆ Upgrade para Pro (R$ 97/mês)
               </Link>
             )}
 
+            {/* Resumo */}
+            <div className="bg-zinc-950 border border-white/10 p-4 rounded-lg">
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-white/60">Plano {plan.name}</span>
+                  <span className="font-bold">R$ {plan.price}/mês</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-white/60">Trial gratuito</span>
+                  <span className="text-[#00C853] font-bold">7 dias</span>
+                </div>
+                <div className="flex justify-between pt-2 border-t border-white/5">
+                  <span className="text-white/60">Cobrança hoje</span>
+                  <span className="font-black text-lg">R$ 0,00</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* COLUNA DIREITA - Form (3/5) */}
+          <div className="lg:col-span-3">
+            <div className="bg-zinc-950 border border-white/10 rounded-lg p-6 md:p-8">
+              <h2 className="text-2xl font-black mb-2">
+                Crie sua conta DataScout
+              </h2>
+              <p className="text-white/60 text-sm mb-6">
+                Você já estará logado quando finalizar o pagamento.
+              </p>
+
+              {error && (
+                <div className="mb-6 p-3 bg-red-500/10 border border-red-500/30 rounded text-red-400 text-sm flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Email */}
+                <div>
+                  <label className="block text-sm font-bold mb-2">
+                    E-mail <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="seu@email.com"
+                    className="w-full px-4 py-3 bg-black border border-white/10 rounded text-white placeholder:text-white/30 focus:border-[#00C853] focus:outline-none transition"
+                  />
+                </div>
+
+                {/* Senha */}
+                <div>
+                  <label className="block text-sm font-bold mb-2">
+                    Senha <span className="text-red-400">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Mínimo 6 caracteres"
+                      minLength={6}
+                      className="w-full px-4 py-3 bg-black border border-white/10 rounded text-white placeholder:text-white/30 focus:border-[#00C853] focus:outline-none transition pr-12"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70 transition"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="w-5 h-5" />
+                      ) : (
+                        <Eye className="w-5 h-5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Nome (opcional) */}
+                <div>
+                  <label className="block text-sm font-bold mb-2">
+                    Nome completo{" "}
+                    <span className="text-white/40 text-xs font-normal">
+                      (opcional)
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="João Silva"
+                    className="w-full px-4 py-3 bg-black border border-white/10 rounded text-white placeholder:text-white/30 focus:border-[#00C853] focus:outline-none transition"
+                  />
+                </div>
+
+                {/* WhatsApp (opcional) */}
+                <div>
+                  <label className="block text-sm font-bold mb-2">
+                    WhatsApp{" "}
+                    <span className="text-white/40 text-xs font-normal">
+                      (opcional, para suporte)
+                    </span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={whatsapp}
+                    onChange={(e) => setWhatsapp(formatWhatsapp(e.target.value))}
+                    placeholder="(11) 99999-9999"
+                    maxLength={15}
+                    className="w-full px-4 py-3 bg-black border border-white/10 rounded text-white placeholder:text-white/30 focus:border-[#00C853] focus:outline-none transition"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-[#00C853] hover:bg-[#00E676] text-black font-black py-4 rounded transition-all hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Criando sua conta...
+                    </>
+                  ) : (
+                    <>
+                      Continuar para pagamento →
+                    </>
+                  )}
+                </button>
+
+                <p className="text-xs text-white/40 text-center">
+                  Ao criar sua conta, você concorda com nossos termos.
+                  <br />
+                  Você não será cobrado nos primeiros 7 dias.
+                </p>
+              </form>
+
+              {/* Trust badges */}
+              <div className="mt-6 pt-6 border-t border-white/5 grid grid-cols-2 gap-2 text-xs text-white/40">
+                {TRUST_BADGES.map((badge) => {
+                  const Icon = badge.icon;
+                  return (
+                    <div
+                      key={badge.label}
+                      className="flex items-center gap-2"
+                    >
+                      <Icon className="w-3 h-3 text-[#00C853]" />
+                      <span>{badge.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-4 text-center text-xs text-white/30">
+                Já tem conta?{" "}
+                <Link
+                  href="/login"
+                  className="text-[#00C853] hover:underline font-bold"
+                >
+                  Faça login
+                </Link>
+              </div>
+            </div>
+
             {/* Social proof */}
-            <div className="bg-zinc-950 border border-white/5 p-6 rounded-lg">
-              <div className="flex items-center gap-1 mb-3">
+            <div className="mt-6 bg-zinc-950 border border-white/5 p-4 rounded-lg">
+              <div className="flex items-center gap-1 mb-2">
                 {[1, 2, 3, 4, 5].map((i) => (
                   <Star
                     key={i}
-                    className="w-4 h-4 text-[#00C853]"
+                    className="w-3 h-3 text-[#00C853]"
                     fill="currentColor"
                   />
                 ))}
-                <span className="text-sm text-white/60 ml-2">
-                  4.9 / 5 — apostadores que viraram analistas
+                <span className="text-xs text-white/60 ml-2">
+                  4.9 / 5 — apostadores satisfeitos
                 </span>
               </div>
-              <p className="text-white/80 text-sm italic mb-3">
-                &quot;Em 2 meses recuperei o investimento e ainda saí no lucro.
-                A análise do intervalo é o diferencial — vejo a partida virar e
-                tomo decisões antes da maioria.&quot;
+              <p className="text-white/70 text-xs italic">
+                &quot;Em 2 meses recuperei o investimento. A análise do
+                intervalo é o diferencial.&quot;
               </p>
-              <div className="text-xs text-white/40">
-                — Apostador profissional há 5 anos
-              </div>
             </div>
-          </div>
-
-          {/* COLUNA DIREITA - CTA de Pagamento (2/5) */}
-          <div className="lg:col-span-2">
-            <div className="lg:sticky lg:top-24">
-              <div className="bg-zinc-950 border border-white/10 p-6 rounded-lg">
-                <h3 className="text-lg font-bold mb-1">Resumo do pedido</h3>
-                <p className="text-white/40 text-xs mb-6">
-                  7 dias grátis, depois R$ {plan.price}/mês
-                </p>
-
-                {/* Highlight: 3 análises grátis */}
-                <div className="bg-[#00C853]/10 border border-[#00C853]/30 p-3 mb-6 rounded">
-                  <div className="flex items-start gap-2">
-                    <div className="bg-[#00C853] text-black text-xs font-black px-2 py-0.5 rounded flex-shrink-0">
-                      GRÁTIS
-                    </div>
-                    <div className="text-sm">
-                      <strong className="text-white">3 análises de teste</strong>
-                      <span className="text-white/60"> durante o trial — sem cobrança</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-3 mb-6 pb-6 border-b border-white/5">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-white/60">Plano {plan.name}</span>
-                    <span className="font-bold">R$ {plan.price}/mês</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-white/60">Trial gratuito</span>
-                    <span className="text-[#00C853] font-bold">7 dias</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-white/60">Cobrança hoje</span>
-                    <span className="font-black text-lg">R$ 0,00</span>
-                  </div>
-                </div>
-
-                <div className="text-xs text-white/40 mb-6 leading-relaxed">
-                  Após 7 dias, sua assinatura iniciará automaticamente em
-                  <strong className="text-white/60"> R$ {plan.price}/mês</strong>.
-                  Cancele a qualquer momento antes do fim do trial e não pague
-                  nada.
-                </div>
-
-                {error && (
-                  <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded text-red-400 text-sm flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                    <span>{error}</span>
-                  </div>
-                )}
-
-                <button
-                  onClick={handleCheckout}
-                  disabled={loading}
-                  className="w-full bg-[#00C853] hover:bg-[#00E676] text-black font-black py-4 px-6 rounded transition-all hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 mb-4"
-                >
-                  {loading ? "Carregando..." : "Começar trial grátis →"}
-                </button>
-
-                <div className="grid grid-cols-2 gap-2 text-xs text-white/40">
-                  {TRUST_BADGES.map((badge) => {
-                    const Icon = badge.icon;
-                    return (
-                      <div
-                        key={badge.label}
-                        className="flex items-center gap-2"
-                      >
-                        <Icon className="w-3 h-3 text-[#00C853]" />
-                        <span>{badge.label}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Garantia */}
-              <div className="mt-4 p-4 bg-[#00C853]/5 border border-[#00C853]/20 rounded-lg">
-                <div className="flex items-start gap-3">
-                  <Shield className="w-5 h-5 text-[#00C853] flex-shrink-0 mt-0.5" />
-                  <div>
-                    <div className="font-bold text-sm mb-1">
-                      Garantia de 7 dias
-                    </div>
-                    <div className="text-white/60 text-xs leading-relaxed">
-                      Se não achar que vale a pena, cancele dentro do trial e
-                      não pague nada. Sem perguntas.
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Stripe trust */}
-              <div className="mt-4 text-center">
-                <div className="text-xs text-white/30 flex items-center justify-center gap-2">
-                  <Lock className="w-3 h-3" />
-                  Pagamento processado pela Stripe
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* FAQ rápido */}
-        <div className="mt-16 max-w-3xl mx-auto">
-          <h3 className="text-2xl font-black text-center mb-8">
-            Dúvidas comuns antes de assinar
-          </h3>
-
-          <div className="space-y-3">
-            {[
-              {
-                q: "O que acontece após o trial de 7 dias?",
-                a: "Após 7 dias, sua assinatura é cobrada automaticamente. Você pode cancelar a qualquer momento antes disso e não será cobrado nada.",
-              },
-              {
-                q: "Posso cancelar a qualquer momento?",
-                a: "Sim. Sem fidelidade, sem multa. Cancele com 1 clique direto na sua conta.",
-              },
-              {
-                q: "Como recebo meu acesso após o pagamento?",
-                a: "Você recebe um e-mail imediatamente com link para criar sua senha e acessar a plataforma.",
-              },
-              {
-                q: "Vocês garantem que vou ganhar dinheiro?",
-                a: "Não. Nenhuma plataforma séria pode prometer ganhos. Entregamos análises probabilísticas para você tomar decisões fundamentadas — não com base em sorte.",
-              },
-            ].map((faq, i) => (
-              <details
-                key={i}
-                className="bg-zinc-950 border border-white/5 rounded-lg group"
-              >
-                <summary className="p-4 cursor-pointer hover:bg-white/[0.02] transition flex items-center justify-between font-bold text-sm">
-                  {faq.q}
-                  <span className="text-[#00C853] group-open:rotate-180 transition">
-                    ▼
-                  </span>
-                </summary>
-                <div className="px-4 pb-4 text-white/60 text-sm leading-relaxed">
-                  {faq.a}
-                </div>
-              </details>
-            ))}
           </div>
         </div>
       </div>
 
-      {/* Footer minimalista */}
+      {/* Footer */}
       <footer className="border-t border-white/5 mt-16 py-8 text-center text-white/30 text-xs">
         <div className="max-w-6xl mx-auto px-6">
           <div className="mb-2">
             © {new Date().getFullYear()} DataScout. Todos os direitos
             reservados.
           </div>
-          <div>
-            Aposte com responsabilidade. Apenas para maiores de 18 anos.
-          </div>
+          <div>Aposte com responsabilidade. Apenas para maiores de 18 anos.</div>
         </div>
       </footer>
     </div>
   );
 }
 
-// =============================================================================
-// MAIN COMPONENT (com Suspense para useSearchParams)
-// =============================================================================
-
 export default function CheckoutPage() {
   return (
     <Suspense
       fallback={
         <div className="min-h-screen bg-black text-white flex items-center justify-center">
-          <div className="text-white/60">Carregando...</div>
+          <Loader2 className="w-12 h-12 text-[#00C853] animate-spin" />
         </div>
       }
     >
