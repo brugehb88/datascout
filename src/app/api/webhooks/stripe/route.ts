@@ -2,26 +2,18 @@ import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
+
 export const maxDuration = 30;
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2026-02-25.clover",
 });
 
+// Cliente Supabase com service role (para criar usuários)
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
-
-// Tipos de eventos suportados
-type SupportedEvent =
-  | "payment_intent.succeeded"
-  | "payment_intent.payment_failed"
-  | "customer.subscription.created"
-  | "customer.subscription.updated"
-  | "customer.subscription.deleted"
-  | "invoice.paid"
-  | "invoice.payment_failed";
 
 /**
  * Handler de webhook da Stripe
@@ -56,17 +48,11 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Log do evento recebido
     console.log(`✅ Received event: ${event.type}`);
 
-    // Roteador de eventos
-    switch (event.type as SupportedEvent) {
-      case "payment_intent.succeeded":
-        await handlePaymentIntentSucceeded(event.data.object as Stripe.PaymentIntent);
-        break;
-
-      case "payment_intent.payment_failed":
-        await handlePaymentIntentFailed(event.data.object as Stripe.PaymentIntent);
+    switch (event.type) {
+      case "checkout.session.completed":
+        await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
         break;
 
       case "customer.subscription.created":
@@ -104,54 +90,95 @@ export async function POST(req: NextRequest) {
 }
 
 /**
- * Pagamento realizado com sucesso
+ * 🎯 EVENTO PRINCIPAL: Checkout completo
+ * Cria conta no Supabase + envia email mágico
  */
-async function handlePaymentIntentSucceeded(
-  paymentIntent: Stripe.PaymentIntent
-) {
-  console.log("💳 Payment Intent succeeded:", paymentIntent.id);
+async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+  console.log("🎉 Checkout completed:", session.id);
 
-  const customerId = paymentIntent.customer as string;
+  const customerEmail = session.customer_email || session.customer_details?.email;
+  const customerId = session.customer as string;
+  const subscriptionId = session.subscription as string;
+  const planId = session.metadata?.plan_id || "pro";
 
-  if (!customerId) {
-    console.warn("No customer ID found in payment intent");
+  if (!customerEmail) {
+    console.error("❌ No email found in checkout session");
     return;
   }
 
-  // Atualizar status do usuário no banco de dados
-  // Exemplo: ativar acesso ao plano
-  await supabase
-    .from("users")
-    .update({
-      stripe_payment_status: "success",
-      updated_at: new Date().toISOString(),
-    })
-    .eq("stripe_customer_id", customerId);
-}
+  console.log(`📧 Processing new customer: ${customerEmail}`);
 
-/**
- * Pagamento falhou
- */
-async function handlePaymentIntentFailed(
-  paymentIntent: Stripe.PaymentIntent
-) {
-  console.log("❌ Payment Intent failed:", paymentIntent.id);
+  try {
+    // 1. Verificar se o usuário já existe
+    const { data: existingUsers } = await supabase.auth.admin.listUsers();
+    const existingUser = existingUsers?.users?.find(
+      (u) => u.email === customerEmail
+    );
 
-  const customerId = paymentIntent.customer as string;
+    let userId: string;
 
-  if (!customerId) {
-    console.warn("No customer ID found in payment intent");
-    return;
+    if (existingUser) {
+      // Usuário já existe - apenas atualiza
+      console.log(`👤 User already exists: ${existingUser.id}`);
+      userId = existingUser.id;
+    } else {
+      // 2. Criar novo usuário no Supabase Auth
+      const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
+        email: customerEmail,
+        email_confirm: true, // Já considera o email confirmado
+        user_metadata: {
+          plan_id: planId,
+          stripe_customer_id: customerId,
+          source: "checkout_public",
+        },
+      });
+
+      if (createError) {
+        console.error("❌ Error creating user:", createError);
+        throw createError;
+      }
+
+      userId = newUser.user!.id;
+      console.log(`✨ New user created: ${userId}`);
+    }
+
+    // 3. Criar/atualizar registro de subscription no banco
+    const { error: subError } = await supabase
+      .from("subscriptions")
+      .upsert(
+        {
+          user_id: userId,
+          stripe_customer_id: customerId,
+          stripe_subscription_id: subscriptionId,
+          plan_id: planId,
+          status: "trialing",
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" }
+      );
+
+    if (subError) {
+      console.error("⚠️ Error saving subscription:", subError);
+    }
+
+    // 4. Enviar email mágico (Magic Link) para o cliente
+    const { error: emailError } = await supabase.auth.admin.generateLink({
+      type: "magiclink",
+      email: customerEmail,
+      options: {
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || "https://datascout.com.br"}/auth/callback`,
+      },
+    });
+
+    if (emailError) {
+      console.error("⚠️ Error generating magic link:", emailError);
+    } else {
+      console.log(`✉️ Magic link sent to: ${customerEmail}`);
+    }
+  } catch (error) {
+    console.error("❌ Error in handleCheckoutCompleted:", error);
+    throw error;
   }
-
-  // Notificar usuário ou tomar ação apropriada
-  await supabase
-    .from("users")
-    .update({
-      stripe_payment_status: "failed",
-      updated_at: new Date().toISOString(),
-    })
-    .eq("stripe_customer_id", customerId);
 }
 
 /**
@@ -164,20 +191,19 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
   const priceId = subscription.items.data[0]?.price.id;
   const status = subscription.status;
 
-  // Atualizar usuário com informações de subscription
   await supabase
-    .from("users")
+    .from("subscriptions")
     .update({
       stripe_subscription_id: subscription.id,
       stripe_price_id: priceId,
-      stripe_subscription_status: status,
+      status,
       updated_at: new Date().toISOString(),
     })
     .eq("stripe_customer_id", customerId);
 }
 
 /**
- * Subscription atualizada (mudança de plano, ciclo, etc.)
+ * Subscription atualizada
  */
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   console.log("🔄 Subscription updated:", subscription.id);
@@ -187,10 +213,10 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   const status = subscription.status;
 
   await supabase
-    .from("users")
+    .from("subscriptions")
     .update({
       stripe_price_id: priceId,
-      stripe_subscription_status: status,
+      status,
       updated_at: new Date().toISOString(),
     })
     .eq("stripe_customer_id", customerId);
@@ -204,12 +230,10 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 
   const customerId = subscription.customer as string;
 
-  // Desativar acesso ou marcar como cancelado
   await supabase
-    .from("users")
+    .from("subscriptions")
     .update({
-      stripe_subscription_status: "canceled",
-      stripe_subscription_id: null,
+      status: "canceled",
       updated_at: new Date().toISOString(),
     })
     .eq("stripe_customer_id", customerId);
@@ -223,9 +247,8 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
 
   const customerId = invoice.customer as string;
 
-  // Registrar pagamento ou atualizar período
   await supabase
-    .from("users")
+    .from("subscriptions")
     .update({
       last_payment_date: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -241,11 +264,10 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
 
   const customerId = invoice.customer as string;
 
-  // Notificar usuário ou tomar ação
   await supabase
-    .from("users")
+    .from("subscriptions")
     .update({
-      last_payment_failed: new Date().toISOString(),
+      status: "past_due",
       updated_at: new Date().toISOString(),
     })
     .eq("stripe_customer_id", customerId);
