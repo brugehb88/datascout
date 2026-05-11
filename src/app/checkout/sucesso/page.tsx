@@ -3,7 +3,6 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle2, Loader2 } from "lucide-react";
-import { createBrowserClient } from "@supabase/ssr";
 
 function SuccessContent() {
   const searchParams = useSearchParams();
@@ -19,46 +18,43 @@ function SuccessContent() {
         return;
       }
 
+      // Pega credenciais salvas no sessionStorage
+      const email = sessionStorage.getItem("pending_login_email");
+      const password = sessionStorage.getItem("pending_login_password");
+
+      if (!email || !password) {
+        setStatus("error");
+        return;
+      }
+
       // Pequeno delay para o webhook processar
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
       try {
-        // Pega credenciais salvas no sessionStorage
-        const email = sessionStorage.getItem("pending_login_email");
-        const password = sessionStorage.getItem("pending_login_password");
+        // Faz o login via API server-side
+        // Assim o middleware seta o cookie no domínio raiz .datascout.com.br
+        const response = await fetch("/api/auth/login-after-checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
 
-        if (email && password) {
-          // Faz login no browser para criar sessão
-          const supabase = createBrowserClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-          );
-
-          const { error: signInError } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-          });
-
-          // Limpa credenciais do sessionStorage
-          sessionStorage.removeItem("pending_login_email");
-          sessionStorage.removeItem("pending_login_password");
-
-          if (signInError) {
-            console.error("Auto-login error:", signInError);
-            setStatus("error");
-            return;
-          }
-
-          setStatus("success");
-
-          // Aguarda 1.5s e redireciona para o subdomínio app
-          setTimeout(() => {
-            window.location.href = "https://app.datascout.com.br/";
-          }, 1500);
-        } else {
-          // Sem credenciais salvas, manda pra login
+        if (!response.ok) {
+          console.error("Auto-login error");
           setStatus("error");
+          return;
         }
+
+        // Limpa credenciais
+        sessionStorage.removeItem("pending_login_email");
+        sessionStorage.removeItem("pending_login_password");
+
+        setStatus("success");
+
+        // Redireciona para o subdomínio app
+        setTimeout(() => {
+          window.location.href = "https://app.datascout.com.br/";
+        }, 1500);
       } catch (err) {
         console.error("Error:", err);
         setStatus("error");
