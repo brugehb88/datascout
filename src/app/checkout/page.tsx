@@ -25,7 +25,7 @@ const PLANS = {
     price: 47,
     priceId:
       process.env.NEXT_PUBLIC_STRIPE_PRICE_STARTER ||
-      "price_1TFLpwRpq7vHDxvseVlcf6n5",
+      "price_1TWio1Rpq7vHDxvslNAcxhRA",
     description:
       "Ideal pra quem quer começar com análises sólidas nas ligas principais.",
     features: [
@@ -41,7 +41,7 @@ const PLANS = {
     price: 97,
     priceId:
       process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO ||
-      "price_1TFLq9Rpq7vHDxvs6WHcjCIf",
+      "price_1TWioGRpq7vHDxvs0kYn5nzw",
     description:
       "Pra quem leva a sério. Todas as ligas, histórico e análise de intervalo.",
     features: [

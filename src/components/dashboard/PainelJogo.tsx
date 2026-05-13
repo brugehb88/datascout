@@ -342,7 +342,7 @@ export default function PainelJogo({ jogo }: Props) {
         return
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_N8N_URL}/analise`, {
+      const response = await fetch('/api/analise', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fixture_id: jogo.id }),
@@ -412,7 +412,7 @@ export default function PainelJogo({ jogo }: Props) {
 
     setGerandoIntervalo(true)
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_N8N_URL}/analise-intervalo`, {
+      const response = await fetch('/api/analise-intervalo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fixture_id: jogo.id }),

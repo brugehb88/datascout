@@ -105,13 +105,13 @@ export async function POST(request: NextRequest) {
     })
 
     // 5. Cria registro inicial em subscriptions
-    const { error: subError } = await supabaseAdmin.from('subscriptions').insert({
-      user_id: userId,
-      stripe_customer_id: customer.id,
-      plan: planId,
-      chosen_plan: planId,
-      status: 'pending',
-    })
+    const { error: subError } = await supabaseAdmin.from('subscriptions').upsert({
+  user_id: userId,
+  stripe_customer_id: customer.id,
+  plan: planId,
+  chosen_plan: planId,
+  status: 'pending',
+}, { onConflict: 'user_id' })
 
     if (subError) {
       console.error('⚠️ Error creating subscription record:', subError)
