@@ -96,7 +96,7 @@ const STEPS = [
 const PLANS = [
   {
     name: "Starter",
-    price: "47",
+    price: "29,90",
     period: "/mês",
     description: "Ideal pra quem quer começar com análises sólidas nas ligas principais.",
     features: [
@@ -110,7 +110,7 @@ const PLANS = [
   },
   {
     name: "Pro",
-    price: "97",
+    price: "49,90",
     period: "/mês",
     description: "Pra quem leva a sério. Todas as ligas, histórico e análise de intervalo.",
     features: [

@@ -18,13 +18,13 @@ const planos = [
   {
     id: 'starter',
     nome: 'Starter',
-    preco: 47,
+    preco: 29.90,
     priceId: 'price_1TWio1Rpq7vHDxvslNAcxhRA',
     cor: 'emerald',
     icone: Zap,
     descricao: 'Ideal pra quem quer começar com análises sólidas nas ligas principais.',
     features: [
-      { icone: Sparkles, texto: '30 análises pré-jogo por mês' },
+      { icone: Sparkles, texto: '15 análises pré-jogo por mês' },
       { icone: Globe, texto: '10 ligas principais (BR + Europa top 5)' },
       { icone: Shield, texto: 'Veredito estatístico potencializado por IA' },
     ],
@@ -37,14 +37,14 @@ const planos = [
   {
     id: 'pro',
     nome: 'Pro',
-    preco: 97,
+    preco: 49.90,
     priceId: 'price_1TWioGRpq7vHDxvs0kYn5nzw',
     cor: 'amber',
     icone: Crown,
     destaque: true,
     descricao: 'Pra quem leva a sério. Todas as ligas, histórico e análise de intervalo.',
     features: [
-      { icone: Sparkles, texto: '150 análises pré-jogo por mês' },
+      { icone: Sparkles, texto: '30 a 50 análises pré-jogo por mês' },
       { icone: Globe, texto: '20+ ligas (todas disponíveis)' },
       { icone: History, texto: 'Histórico completo de análises' },
       { icone: FileText, texto: 'Exportar análises em PDF' },

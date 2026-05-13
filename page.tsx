@@ -96,37 +96,36 @@ const STEPS = [
 const PLANS = [
   {
     name: "Starter",
-    price: "29",
+    price: "29,90",
     period: "/mês",
-    description: "Para quem quer começar a apostar com inteligência.",
+    description: "Ideal pra quem quer começar com análises sólidas nas ligas principais.",
     features: [
-      "Análise pré-jogo das principais ligas",
-      "Probabilidades calculadas",
-      "Histórico básico de confrontos",
-      "Suporte por e-mail",
+      "15 análises pré-jogo por mês",
+      "10 ligas principais (BR + Europa top 5)",
+      "Veredito estatístico potencializado por IA",
+      "Suporte técnico",
     ],
     cta: "Começar com Starter",
     highlight: false,
   },
   {
     name: "Pro",
-    price: "79",
+    price: "49,90",
     period: "/mês",
-    description: "Para quem quer dominar o intervalo e maximizar acertos.",
+    description: "Pra quem leva a sério. Todas as ligas, histórico e análise de intervalo.",
     features: [
-      "Tudo do Starter, e mais:",
-      "Análise no intervalo (meio-tempo)",
-      "Dados em tempo real durante a partida",
-      "Histórico completo + tendências",
-      "Análise de mercados específicos (escanteios, cartões)",
-      "Suporte prioritário no WhatsApp",
+      "30 a 50 análises pré-jogo por mês",
+      "20+ ligas (todas disponíveis)",
+      "Análise de intervalo (halftime) — EXCLUSIVO",
+      "Histórico completo de análises",
+      "Alertas de jogos com alta confiança",
+      "Suporte no WhatsApp",
     ],
     cta: "Quero o Pro",
     highlight: true,
     badge: "MAIS ESCOLHIDO",
   },
 ];
-
 const FAQS = [
   {
     q: "O DataScout garante que vou ganhar minhas apostas?",

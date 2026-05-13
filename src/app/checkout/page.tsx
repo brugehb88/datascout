@@ -22,14 +22,14 @@ const PLANS = {
   starter: {
     id: "starter",
     name: "Starter",
-    price: 47,
+    price: 29.90,
     priceId:
       process.env.NEXT_PUBLIC_STRIPE_PRICE_STARTER ||
       "price_1TWio1Rpq7vHDxvslNAcxhRA",
     description:
       "Ideal pra quem quer começar com análises sólidas nas ligas principais.",
     features: [
-      "30 análises pré-jogo por mês",
+      "15 análises pré-jogo por mês",
       "10 ligas principais (BR + Europa top 5)",
       "Veredito estatístico potencializado por IA",
       "Suporte por e-mail",
@@ -38,14 +38,14 @@ const PLANS = {
   pro: {
     id: "pro",
     name: "Pro",
-    price: 97,
+    price: 49.90,
     priceId:
       process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO ||
       "price_1TWioGRpq7vHDxvs0kYn5nzw",
     description:
       "Pra quem leva a sério. Todas as ligas, histórico e análise de intervalo.",
     features: [
-      "150 análises pré-jogo por mês",
+      "30 a 50 análises pré-jogo por mês",
       "20+ ligas (todas disponíveis)",
       "Análise de intervalo (halftime) — EXCLUSIVO",
       "Histórico completo de análises",
