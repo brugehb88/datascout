@@ -90,7 +90,7 @@ export default function PlanosPage() {
 
     try {
       // Se já tem assinatura ativa, redireciona pro portal do Stripe
-      if (sub?.stripe_subscription_id) {
+      if (sub?.stripe_subscription_id && sub?.status === 'active') {
         const response = await fetch('/api/stripe/portal', { method: 'POST' })
         const data = await response.json()
         if (data.url) {
@@ -99,7 +99,7 @@ export default function PlanosPage() {
         }
       }
 
-      // Senão, cria novo checkout
+      // Senão, cria novo checkout (antecipar trial ou nova assinatura)
       const planoConfig = planos.find(p => p.id === planoId)
       const priceId = planoConfig?.priceId
       const skipTrial = sub?.status === 'trialing'
@@ -123,10 +123,24 @@ export default function PlanosPage() {
     }
   }
 
-  // Determinar plano efetivo do usuário
-  const planoAtualId = sub?.status === 'active' ? sub.plan : sub?.chosen_plan || 'starter'
   const emTrial = sub?.status === 'trialing'
   const assinaturaAtiva = sub?.status === 'active'
+
+  // Plano escolhido: durante trial, usa chosen_plan; se ativo, usa plan
+  // Fallback: se chosen_plan for null/undefined, usa plan, depois 'starter'
+  const planoEscolhidoId = assinaturaAtiva
+    ? (sub?.plan || 'starter')
+    : (sub?.chosen_plan || sub?.plan || 'starter')
+
+  if (loading || authLoading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center py-20">
+          <p className="text-gray-500 text-sm">Carregando...</p>
+        </div>
+      </MainLayout>
+    )
+  }
 
   return (
     <MainLayout>
@@ -142,7 +156,7 @@ export default function PlanosPage() {
           <h1 className="text-white font-bold text-xl mb-1">Escolha seu plano</h1>
           <p className="text-gray-500 text-sm">
             {emTrial
-              ? 'Você está no trial gratuito. Assine agora para garantir acesso contínuo ou aguarde o fim do período de teste.'
+              ? `Você está no trial gratuito. Seu plano ${planoEscolhidoId === 'pro' ? 'Pro' : 'Starter'} será ativado automaticamente ao final do trial, ou antecipe agora.`
               : assinaturaAtiva
                 ? 'Gerencie sua assinatura ou faça upgrade/downgrade.'
                 : 'Assine para acessar análises completas.'}
@@ -153,13 +167,16 @@ export default function PlanosPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {planos.map((plano) => {
             const Icone = plano.icone
-            const isPlanoAtual = planoAtualId === plano.id
-            const isAtivo = assinaturaAtiva && sub?.plan === plano.id
 
-            const corBorder = isPlanoAtual
-              ? plano.cor === 'amber' ? 'border-amber-500/30' : 'border-emerald-500/30'
+            // Durante trial: destaca o plano ESCOLHIDO (chosen_plan)
+            // Se ativo: destaca o plano ATUAL
+            const isPlanoEscolhido = planoEscolhidoId === plano.id
+            const isPlanoAtivo = assinaturaAtiva && sub?.plan === plano.id
+
+            const corBorder = isPlanoEscolhido
+              ? plano.cor === 'amber' ? 'border-amber-500/40' : 'border-emerald-500/40'
               : 'border-gray-800'
-            const corBg = isPlanoAtual
+            const corBg = isPlanoEscolhido
               ? plano.cor === 'amber' ? 'bg-amber-500/5' : 'bg-emerald-500/5'
               : ''
             const corTexto = plano.cor === 'amber' ? 'text-amber-400' : 'text-emerald-400'
@@ -167,22 +184,28 @@ export default function PlanosPage() {
               ? 'bg-amber-500 hover:bg-amber-400 text-gray-950'
               : 'bg-emerald-500 hover:bg-emerald-400 text-gray-950'
 
-            // Determinar label do botão
+            // Label do botão
             let btnLabel = 'Assinar agora'
             let btnDisabled = false
 
-            if (isAtivo) {
+            if (isPlanoAtivo) {
               btnLabel = 'Plano atual'
               btnDisabled = true
-            } else if (emTrial && isPlanoAtual) {
+            } else if (emTrial && isPlanoEscolhido) {
               btnLabel = 'Antecipar assinatura'
-            } else if (emTrial && !isPlanoAtual) {
-              btnLabel = 'Assinar este plano'
+            } else if (emTrial && !isPlanoEscolhido) {
+              btnLabel = 'Mudar para este plano'
             } else if (assinaturaAtiva && plano.id === 'pro') {
-              btnLabel = 'Fazer upgrade'
+              btnLabel = 'Fazer upgrade para Pro'
             } else if (assinaturaAtiva && plano.id === 'starter') {
               btnLabel = 'Fazer downgrade'
             }
+
+            // Badge label
+            let badgeLabel = ''
+            if (emTrial && isPlanoEscolhido) badgeLabel = 'Seu plano'
+            else if (isPlanoAtivo) badgeLabel = 'Atual'
+            else if (plano.destaque && !isPlanoEscolhido) badgeLabel = 'Mais popular'
 
             return (
               <div
@@ -196,19 +219,14 @@ export default function PlanosPage() {
                     <span className="text-white font-bold text-lg">{plano.nome}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    {isPlanoAtual && (
+                    {badgeLabel && (
                       <span className={`text-xs px-2.5 py-1 rounded-full border font-medium flex items-center gap-1 ${
                         plano.cor === 'amber'
                           ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
                           : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                       }`}>
-                        <Check size={10} />
-                        {emTrial ? 'Selecionado' : 'Atual'}
-                      </span>
-                    )}
-                    {plano.destaque && !isPlanoAtual && (
-                      <span className="text-xs px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">
-                        Mais popular
+                        {(isPlanoEscolhido || isPlanoAtivo) && <Check size={10} />}
+                        {badgeLabel}
                       </span>
                     )}
                   </div>
@@ -278,7 +296,8 @@ export default function PlanosPage() {
         {/* Nota */}
         {emTrial && (
           <p className="text-gray-600 text-xs text-center mt-6">
-            Ao assinar, você inicia um trial de 7 dias. A cobrança acontece apenas ao final do período.
+            Ao antecipar, a cobrança acontece imediatamente e o trial é encerrado.
+            Caso não antecipe, o plano é ativado automaticamente ao final do período.
           </p>
         )}
       </div>

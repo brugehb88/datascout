@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Crown, Zap, Calendar, BarChart2, LogOut, ChevronRight, User, CreditCard } from 'lucide-react'
+import { Crown, Zap, Calendar, BarChart2, LogOut, ChevronRight, CreditCard } from 'lucide-react'
 import MainLayout from '@/components/layout/mainlayout'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
@@ -61,12 +61,28 @@ export default function PerfilPage() {
     return null
   }
 
-  const plano = planConfig[sub?.plan ?? 'trial']
+  const trialAtivo = sub?.status === 'trialing'
+  const assinaturaAtiva = sub?.status === 'active'
+
+  // Plano a exibir no badge: durante trial, mostra o chosen_plan (o que vai virar)
+  // Se ativo, mostra o plano atual
+  const planoExibido = assinaturaAtiva
+    ? (sub?.plan ?? 'starter')
+    : trialAtivo
+      ? 'trial'
+      : (sub?.plan ?? 'trial')
+
+  const plano = planConfig[planoExibido] ?? planConfig['trial']
   const PlanoIcone = plano.icone
+
+  // Plano escolhido (que vai ativar após trial)
+  const chosenPlan = sub?.chosen_plan || sub?.plan || 'starter'
+  const chosenPlanConfig = planConfig[chosenPlan] ?? planConfig['starter']
+
   const diasRestantes = sub?.trial_ends_at
     ? Math.max(0, Math.ceil((new Date(sub.trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : 0
-  const trialAtivo = sub?.status === 'trialing' && diasRestantes > 0
+
   const percentUso = sub ? Math.round((sub.analyses_used / sub.analyses_limit) * 100) : 0
 
   // Seção: Assinatura
@@ -74,7 +90,6 @@ export default function PerfilPage() {
     return (
       <MainLayout>
         <div className="max-w-2xl pt-2 md:pt-0">
-          {/* Voltar */}
           <button
             onClick={() => setSecao('menu')}
             className="text-gray-500 text-sm hover:text-gray-300 transition-colors mb-4"
@@ -106,13 +121,17 @@ export default function PerfilPage() {
                   </span>
                 </div>
                 <p className="text-blue-300/60 text-xs">
-                  Plano selecionado após trial: <span className="text-blue-300 font-medium capitalize">{sub?.chosen_plan}</span> — R$ {sub?.chosen_plan === 'pro' ? '97' : '47'}/mês
+                  Plano que será ativado após o trial:{' '}
+                  <span className={`font-medium ${chosenPlanConfig.cor.split(' ')[0]} capitalize`}>
+                    {chosenPlanConfig.nome}
+                  </span>{' '}
+                  — R$ {chosenPlan === 'pro' ? '97' : '47'}/mês
                 </p>
               </div>
             )}
 
             {/* Status ativo */}
-            {!trialAtivo && sub?.status === 'active' && sub.current_period_end && (
+            {assinaturaAtiva && sub?.current_period_end && (
               <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-3 mb-4">
                 <p className="text-emerald-400 text-sm">
                   Assinatura ativa até {new Date(sub.current_period_end).toLocaleDateString('pt-BR')}
@@ -121,7 +140,7 @@ export default function PerfilPage() {
             )}
 
             {/* Trial expirado */}
-            {!trialAtivo && sub?.status === 'expired' && (
+            {sub?.status === 'expired' && (
               <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 mb-4">
                 <p className="text-red-400 text-sm">
                   Seu trial expirou. Assine um plano para continuar usando.
@@ -150,47 +169,33 @@ export default function PerfilPage() {
             </div>
           </div>
 
-          {/* Botão upgrade */}
-          {(sub?.plan === 'trial' || sub?.plan === 'starter') && (
+          {/* Botão upgrade / antecipar */}
+          {(trialAtivo || !assinaturaAtiva) && (
             <button
               onClick={() => router.push('/planos')}
-              className="w-full bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold text-sm py-4 rounded-xl transition-colors flex items-center justify-center gap-2"
+              className="w-full bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold text-sm py-4 rounded-xl transition-colors flex items-center justify-center gap-2 mb-3"
             >
               <Crown size={16} />
-              {sub?.plan === 'trial' ? 'Escolher plano' : 'Fazer upgrade para Pro'}
+              {trialAtivo ? 'Antecipar assinatura' : 'Escolher plano'}
             </button>
           )}
 
-          {/* Gerenciar assinatura */}
+          {/* Gerenciar assinatura via Stripe */}
           {sub?.stripe_subscription_id && (
             <button
-            onClick={async () => {
-              try {
-                const res = await fetch('/api/stripe/portal', { method: 'POST' })
-                const data = await res.json()
-                if (data.url) window.location.href = data.url
-              } catch (err) {
-                console.error('Erro ao abrir portal:', err)
-              }
-            }}
-            className="w-full bg-gray-900 hover:bg-gray-800 border border-gray-800 text-gray-300 text-sm py-3 rounded-xl transition-colors"
-          >
-            Gerenciar assinatura
-            <button
-            onClick={async () => {
-              try {
-                const res = await fetch('/api/stripe/portal', { method: 'POST' })
-                const data = await res.json()
-                if (data.url) window.location.href = data.url
-              } catch (err) {
-                console.error('Erro ao abrir portal:', err)
-              }
-            }}
-            className="w-full bg-gray-900 hover:bg-gray-800 border border-gray-800 text-gray-300 text-sm py-3 rounded-xl transition-colors"
-          >
-            Gerenciar assinatura
-          </button>
-          </button>
+              onClick={async () => {
+                try {
+                  const res = await fetch('/api/stripe/portal', { method: 'POST' })
+                  const data = await res.json()
+                  if (data.url) window.location.href = data.url
+                } catch (err) {
+                  console.error('Erro ao abrir portal:', err)
+                }
+              }}
+              className="w-full bg-gray-900 hover:bg-gray-800 border border-gray-800 text-gray-300 text-sm py-3 rounded-xl transition-colors"
+            >
+              Gerenciar assinatura
+            </button>
           )}
         </div>
       </MainLayout>
@@ -221,31 +226,32 @@ export default function PerfilPage() {
           </div>
         </div>
 
+        {/* Trial banner */}
+        {trialAtivo && (
+          <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 mb-6">
+            <div className="flex items-center gap-2 mb-1">
+              <Calendar size={13} className="text-blue-400" />
+              <span className="text-blue-400 text-sm font-medium">
+                {diasRestantes} {diasRestantes === 1 ? 'dia restante' : 'dias restantes'} de trial
+              </span>
+            </div>
+            <p className="text-blue-300/60 text-xs">
+              Seu plano <span className={`font-medium ${chosenPlanConfig.cor.split(' ')[0]}`}>{chosenPlanConfig.nome}</span> será ativado automaticamente ao final do trial.
+            </p>
+          </div>
+        )}
+
         {/* Menu de opções */}
         <div className="bg-gray-900/80 border border-gray-800 rounded-2xl overflow-hidden mb-6">
           <button
             onClick={() => setSecao('assinatura')}
-            className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-800/50 transition-colors border-b border-gray-800"
+            className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-800/50 transition-colors"
           >
             <div className="flex items-center gap-3">
               <CreditCard size={16} className="text-gray-500" />
               <div className="text-left">
-                <p className="text-gray-200 text-sm font-medium">Assinatura</p>
-                <p className="text-gray-600 text-xs">Plano, uso e cobrança</p>
-              </div>
-            </div>
-            <ChevronRight size={14} className="text-gray-700" />
-          </button>
-
-          <button
-            onClick={() => router.push('/planos')}
-            className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-800/50 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <Crown size={16} className="text-gray-500" />
-              <div className="text-left">
-                <p className="text-gray-200 text-sm font-medium">Planos</p>
-                <p className="text-gray-600 text-xs">Ver planos e fazer upgrade</p>
+                <p className="text-gray-200 text-sm font-medium">Assinatura e planos</p>
+                <p className="text-gray-600 text-xs">Plano, uso, cobrança e upgrade</p>
               </div>
             </div>
             <ChevronRight size={14} className="text-gray-700" />
