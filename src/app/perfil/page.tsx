@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Crown, Zap, Calendar, BarChart2, LogOut, ChevronRight, CreditCard } from 'lucide-react'
+import { Crown, Zap, Calendar, BarChart2, LogOut, ChevronRight, CreditCard, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react'
 import MainLayout from '@/components/layout/mainlayout'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
@@ -22,6 +22,7 @@ const planConfig: Record<string, { nome: string; cor: string; icone: any }> = {
   trial: { nome: 'Trial gratuito', cor: 'text-blue-400 bg-blue-500/10 border-blue-500/20', icone: Zap },
   starter: { nome: 'Starter', cor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', icone: Zap },
   pro: { nome: 'Pro', cor: 'text-amber-400 bg-amber-500/10 border-amber-500/20', icone: Crown },
+  canceled: { nome: 'Cancelado', cor: 'text-red-400 bg-red-500/10 border-red-500/20', icone: XCircle },
 }
 
 export default function PerfilPage() {
@@ -30,6 +31,9 @@ export default function PerfilPage() {
   const [sub, setSub] = useState<Subscription | null>(null)
   const [loading, setLoading] = useState(true)
   const [secao, setSecao] = useState<'menu' | 'assinatura'>('menu')
+  const [cancelando, setCancelando] = useState(false)
+  const [confirmandoCancelamento, setConfirmandoCancelamento] = useState(false)
+  const [mensagem, setMensagem] = useState<{ tipo: 'sucesso' | 'erro'; texto: string } | null>(null)
 
   useEffect(() => {
     async function carregar() {
@@ -39,7 +43,6 @@ export default function PerfilPage() {
         .select('*')
         .eq('user_id', user.id)
         .single()
-
       if (!error && data) setSub(data)
       setLoading(false)
     }
@@ -56,28 +59,24 @@ export default function PerfilPage() {
     )
   }
 
-  if (!user) {
-    router.push('/login')
-    return null
-  }
+  if (!user) { router.push('/login'); return null }
 
   const trialAtivo = sub?.status === 'trialing'
   const assinaturaAtiva = sub?.status === 'active'
+  const cancelado = sub?.status === 'canceled'
 
-  // Plano a exibir no badge: durante trial, mostra o chosen_plan (o que vai virar)
-  // Se ativo, mostra o plano atual
   const planoExibido = assinaturaAtiva
     ? (sub?.plan ?? 'starter')
-    : trialAtivo
-      ? 'trial'
-      : (sub?.plan ?? 'trial')
+    : cancelado ? 'canceled'
+    : trialAtivo ? 'trial'
+    : (sub?.plan ?? 'trial')
 
   const plano = planConfig[planoExibido] ?? planConfig['trial']
   const PlanoIcone = plano.icone
 
-  // Plano escolhido (que vai ativar após trial)
   const chosenPlan = sub?.chosen_plan || sub?.plan || 'starter'
   const chosenPlanConfig = planConfig[chosenPlan] ?? planConfig['starter']
+  const chosenPlanPreco = chosenPlan === 'pro' ? 'R$ 49,90' : 'R$ 29,90'
 
   const diasRestantes = sub?.trial_ends_at
     ? Math.max(0, Math.ceil((new Date(sub.trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
@@ -85,33 +84,74 @@ export default function PerfilPage() {
 
   const percentUso = sub ? Math.round((sub.analyses_used / sub.analyses_limit) * 100) : 0
 
-  // Seção: Assinatura
+  async function abrirPortalStripe() {
+    try {
+      const res = await fetch('/api/stripe/portal', { method: 'POST' })
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+    } catch (err) {
+      setMensagem({ tipo: 'erro', texto: 'Erro ao abrir portal. Tente novamente.' })
+    }
+  }
+
+  async function cancelarTrial() {
+    setCancelando(true)
+    setMensagem(null)
+    try {
+      const res = await fetch('/api/stripe/cancel-trial', { method: 'POST' })
+      const data = await res.json()
+      if (data.success) {
+        setSub(prev => prev ? { ...prev, status: 'canceled' } : null)
+        setMensagem({ tipo: 'sucesso', texto: 'Trial cancelado. Seu acesso foi encerrado.' })
+        setConfirmandoCancelamento(false)
+      } else {
+        throw new Error(data.error)
+      }
+    } catch (err) {
+      setMensagem({ tipo: 'erro', texto: 'Erro ao cancelar. Tente novamente.' })
+    } finally {
+      setCancelando(false)
+    }
+  }
+
+  // Seção: Assinatura completa
   if (secao === 'assinatura') {
     return (
       <MainLayout>
         <div className="max-w-2xl pt-2 md:pt-0">
-          <button
-            onClick={() => setSecao('menu')}
-            className="text-gray-500 text-sm hover:text-gray-300 transition-colors mb-4"
-          >
+          <button onClick={() => setSecao('menu')} className="text-gray-500 text-sm hover:text-gray-300 transition-colors mb-4">
             ← Voltar ao perfil
           </button>
 
-          <h1 className="text-white font-bold text-xl mb-6">Assinatura</h1>
+          <h1 className="text-white font-bold text-xl mb-6">Assinatura e planos</h1>
 
-          {/* Plano atual */}
+          {/* Mensagem de feedback */}
+          {mensagem && (
+            <div className={`flex items-center gap-2 p-4 rounded-xl mb-4 ${
+              mensagem.tipo === 'sucesso'
+                ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
+                : 'bg-red-500/10 border border-red-500/20 text-red-400'
+            }`}>
+              {mensagem.tipo === 'sucesso'
+                ? <CheckCircle2 size={16} />
+                : <AlertTriangle size={16} />}
+              <span className="text-sm">{mensagem.texto}</span>
+            </div>
+          )}
+
+          {/* Status atual */}
           <div className="bg-gray-900/80 border border-gray-800 rounded-2xl p-5 mb-4">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <PlanoIcone size={16} className={plano.cor.split(' ')[0]} />
-                <span className="text-white font-semibold">Plano atual</span>
+                <span className="text-white font-semibold">Status atual</span>
               </div>
               <span className={`text-xs px-3 py-1 rounded-full border font-medium ${plano.cor}`}>
                 {plano.nome}
               </span>
             </div>
 
-            {/* Trial info */}
+            {/* Trial ativo */}
             {trialAtivo && (
               <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl px-4 py-3 mb-4">
                 <div className="flex items-center gap-2 mb-1">
@@ -121,16 +161,12 @@ export default function PerfilPage() {
                   </span>
                 </div>
                 <p className="text-blue-300/60 text-xs">
-                  Plano que será ativado após o trial:{' '}
-                  <span className={`font-medium ${chosenPlanConfig.cor.split(' ')[0]} capitalize`}>
-                    {chosenPlanConfig.nome}
-                  </span>{' '}
-                  — R$ {chosenPlan === 'pro' ? '97' : '47'}/mês
+                  Plano que será ativado: <span className={`font-medium ${chosenPlanConfig.cor.split(' ')[0]}`}>{chosenPlanConfig.nome}</span> — {chosenPlanPreco}/mês
                 </p>
               </div>
             )}
 
-            {/* Status ativo */}
+            {/* Assinatura ativa */}
             {assinaturaAtiva && sub?.current_period_end && (
               <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-3 mb-4">
                 <p className="text-emerald-400 text-sm">
@@ -139,11 +175,11 @@ export default function PerfilPage() {
               </div>
             )}
 
-            {/* Trial expirado */}
-            {sub?.status === 'expired' && (
+            {/* Cancelado */}
+            {cancelado && (
               <div className="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 mb-4">
                 <p className="text-red-400 text-sm">
-                  Seu trial expirou. Assine um plano para continuar usando.
+                  Assinatura cancelada. Assine novamente para recuperar o acesso.
                 </p>
               </div>
             )}
@@ -169,40 +205,91 @@ export default function PerfilPage() {
             </div>
           </div>
 
-          {/* Botão upgrade / antecipar */}
-          {(trialAtivo || !assinaturaAtiva) && (
-            <button
-              onClick={() => router.push('/planos')}
-              className="w-full bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold text-sm py-4 rounded-xl transition-colors flex items-center justify-center gap-2 mb-3"
-            >
-              <Crown size={16} />
-              {trialAtivo ? 'Antecipar assinatura' : 'Escolher plano'}
-            </button>
-          )}
+          {/* Ações */}
+          <div className="flex flex-col gap-3">
+            {/* Upgrade/Mudar plano */}
+            {!cancelado && (
+              <button
+                onClick={() => router.push('/planos')}
+                className="w-full bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold text-sm py-4 rounded-xl transition-colors flex items-center justify-center gap-2"
+              >
+                <Crown size={16} />
+                {trialAtivo ? 'Antecipar assinatura' : assinaturaAtiva ? 'Mudar plano' : 'Assinar agora'}
+              </button>
+            )}
 
-          {/* Gerenciar assinatura via Stripe */}
-          {sub?.stripe_subscription_id && (
-            <button
-              onClick={async () => {
-                try {
-                  const res = await fetch('/api/stripe/portal', { method: 'POST' })
-                  const data = await res.json()
-                  if (data.url) window.location.href = data.url
-                } catch (err) {
-                  console.error('Erro ao abrir portal:', err)
-                }
-              }}
-              className="w-full bg-gray-900 hover:bg-gray-800 border border-gray-800 text-gray-300 text-sm py-3 rounded-xl transition-colors"
-            >
-              Gerenciar assinatura
-            </button>
-          )}
+            {/* Portal Stripe — gerenciar pagamento */}
+            {assinaturaAtiva && sub?.stripe_subscription_id && (
+              <button
+                onClick={abrirPortalStripe}
+                className="w-full bg-gray-900 hover:bg-gray-800 border border-gray-800 text-gray-300 text-sm py-3 rounded-xl transition-colors"
+              >
+                Gerenciar pagamento e cartão
+              </button>
+            )}
+
+            {/* Cancelar assinatura ativa */}
+            {assinaturaAtiva && sub?.stripe_subscription_id && (
+              <button
+                onClick={abrirPortalStripe}
+                className="w-full text-red-400 hover:text-red-300 text-sm py-2 transition-colors"
+              >
+                Cancelar assinatura
+              </button>
+            )}
+
+            {/* Cancelar trial */}
+            {trialAtivo && (
+              <>
+                {!confirmandoCancelamento ? (
+                  <button
+                    onClick={() => setConfirmandoCancelamento(true)}
+                    className="w-full text-red-400/70 hover:text-red-400 text-sm py-2 transition-colors"
+                  >
+                    Cancelar trial gratuito
+                  </button>
+                ) : (
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
+                    <p className="text-red-400 text-sm font-medium mb-1">Tem certeza?</p>
+                    <p className="text-red-400/60 text-xs mb-4">
+                      Ao cancelar, você perderá acesso imediato à plataforma e seus créditos de trial.
+                    </p>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={cancelarTrial}
+                        disabled={cancelando}
+                        className="flex-1 bg-red-500 hover:bg-red-400 disabled:opacity-50 text-white font-bold text-sm py-2.5 rounded-lg transition-colors"
+                      >
+                        {cancelando ? 'Cancelando...' : 'Sim, cancelar'}
+                      </button>
+                      <button
+                        onClick={() => setConfirmandoCancelamento(false)}
+                        className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm py-2.5 rounded-lg transition-colors"
+                      >
+                        Manter trial
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Reativar após cancelamento */}
+            {cancelado && (
+              <button
+                onClick={() => router.push('/planos')}
+                className="w-full bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-bold text-sm py-4 rounded-xl transition-colors"
+              >
+                Reativar assinatura
+              </button>
+            )}
+          </div>
         </div>
       </MainLayout>
     )
   }
 
-  // Seção: Menu principal do perfil
+  // Menu principal
   return (
     <MainLayout>
       <div className="max-w-2xl pt-2 md:pt-0">
@@ -217,7 +304,7 @@ export default function PerfilPage() {
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-white font-semibold truncate">{user.user_metadata?.nome || user.email}</p>
+              <p className="text-white font-semibold truncate">{user.user_metadata?.full_name || user.email}</p>
               <p className="text-gray-500 text-sm truncate">{user.email}</p>
             </div>
             <span className={`text-xs px-3 py-1 rounded-full border font-medium ${plano.cor}`}>
@@ -241,7 +328,7 @@ export default function PerfilPage() {
           </div>
         )}
 
-        {/* Menu de opções */}
+        {/* Menu */}
         <div className="bg-gray-900/80 border border-gray-800 rounded-2xl overflow-hidden mb-6">
           <button
             onClick={() => setSecao('assinatura')}
@@ -251,14 +338,13 @@ export default function PerfilPage() {
               <CreditCard size={16} className="text-gray-500" />
               <div className="text-left">
                 <p className="text-gray-200 text-sm font-medium">Assinatura e planos</p>
-                <p className="text-gray-600 text-xs">Plano, uso, cobrança e upgrade</p>
+                <p className="text-gray-600 text-xs">Plano, uso, cobrança, upgrade e cancelamento</p>
               </div>
             </div>
             <ChevronRight size={14} className="text-gray-700" />
           </button>
         </div>
 
-        {/* Sair */}
         <button
           onClick={async () => {
             await supabase.auth.signOut()
