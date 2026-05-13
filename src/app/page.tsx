@@ -195,7 +195,7 @@ function Header() {
             Entrar
           </Link>
           <Link
-            href="/checkout?plan=pro"
+            href="https://app.datascout.com.br/checkout?plan=pro"
             className="bg-[#00C853] hover:bg-[#00E676] text-black font-bold text-sm px-5 py-2.5 transition-all hover:scale-105"
           >
             Começar agora
@@ -254,7 +254,7 @@ function Hero() {
 
           <div className="flex flex-col sm:flex-row gap-4 mb-8">
             <Link
-              href="/checkout?plan=pro"
+              href="https://app.datascout.com.br/checkout?plan=pro"
               className="group bg-[#00C853] hover:bg-[#00E676] text-black font-bold px-8 py-4 transition-all hover:scale-105 flex items-center justify-center gap-2"
             >
               Começar agora
@@ -600,7 +600,7 @@ function HalfTimeFeature() {
           </ul>
 
           <Link
-            href="/checkout?plan=pro"
+            href="https://app.datascout.com.br/checkout?plan=pro"
             className="inline-flex items-center gap-2 bg-[#00C853] hover:bg-[#00E676] text-black font-bold px-8 py-4 transition-all hover:scale-105"
           >
             Quero o plano Pro
@@ -895,7 +895,7 @@ function FinalCTA() {
         </p>
 
         <Link
-          href="/checkout?plan=pro"
+          href="https://app.datascout.com.br/checkout?plan=pro"
           className="inline-flex items-center gap-3 bg-[#00C853] hover:bg-[#00E676] text-black font-black text-lg px-10 py-5 transition-all hover:scale-105"
         >
           Começar agora
