@@ -24,7 +24,6 @@ export async function middleware(request: NextRequest) {
         )
         supabaseResponse = NextResponse.next({ request })
         cookiesToSet.forEach(({ name, value, options }) => {
-          // Domínio compartilhado entre datascout.com.br e app.datascout.com.br
           const isProduction = hostname.includes('datascout.com.br')
           const cookieOptions = isProduction
             ? { ...options, domain: '.datascout.com.br' }
@@ -36,29 +35,30 @@ export async function middleware(request: NextRequest) {
   })
 
   try {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const { data: { user } } = await supabase.auth.getUser()
     const path = request.nextUrl.pathname
 
-    // Subdomínio app: redireciona raiz para /historico se logado, /login se não
-    if (isAppSubdomain && path === '/') {
+    // Subdomínio app: redireciona raiz para /inicio se logado, /login se não
+    if (isAppSubdomain && (path === '/' || path === '')) {
       const url = request.nextUrl.clone()
-      url.pathname = user ? '/historico' : '/login'
+      url.pathname = user ? '/inicio' : '/login'
       return NextResponse.redirect(url)
     }
 
-    // Rotas protegidas (historico, perfil): exige login
-    if (!user && (path.startsWith('/historico') || path.startsWith('/perfil'))) {
+    // Rotas protegidas: exige login
+    const rotasProtegidas = ['/inicio', '/historico', '/perfil']
+    const rotaProtegida = rotasProtegidas.some(r => path.startsWith(r))
+
+    if (!user && rotaProtegida) {
       const url = request.nextUrl.clone()
       url.pathname = '/login'
       return NextResponse.redirect(url)
     }
 
-    // Se logado e tenta acessar /login, vai para /historico
+    // Se logado e tenta acessar /login, vai para /inicio
     if (user && path.startsWith('/login')) {
       const url = request.nextUrl.clone()
-      url.pathname = '/historico'
+      url.pathname = '/inicio'
       return NextResponse.redirect(url)
     }
   } catch {

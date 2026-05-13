@@ -178,12 +178,14 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
   const ligasFiltradas = ligasOrdenadas.filter(l =>
     l.toLowerCase().includes(busca.toLowerCase())
   )
-  const naHome = pathname === '/'
+
+  // "Início" agora é /inicio (dashboard)
+  const naHome = pathname === '/inicio' || pathname === '/'
 
   function handleClickLiga(liga: string) {
     const permitida = ligaPermitidaPorNome(liga, planoEfetivo)
     if (!permitida) {
-      router.push('/planos')
+      router.push('/perfil')
       if (onFechar) onFechar()
       return
     }
@@ -195,14 +197,14 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
     }
 
     if (!naHome) {
-      router.push('/')
+      router.push('/inicio')
     }
     if (onFechar) onFechar()
   }
 
   function handleHome() {
     setLiga(null)
-    router.push('/')
+    router.push('/inicio')
     if (onFechar) onFechar()
   }
 
@@ -238,7 +240,6 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
           <Logo />
         </button>
         <div className="flex items-center gap-2">
-          {/* Sino de alertas */}
           <button
             onClick={() => setAlertasAberto(true)}
             className="relative text-gray-500 hover:text-gray-300 transition-colors p-1"
@@ -298,7 +299,7 @@ function SidebarConteudo({ onFechar }: { onFechar?: () => void }) {
         </div>
       </div>
 
-      {/* Ligas como navegação */}
+      {/* Ligas */}
       <div className="p-4 flex-1 overflow-y-auto">
         <div className="flex items-center gap-1 mb-3">
           <Trophy size={13} className="text-gray-500" />
