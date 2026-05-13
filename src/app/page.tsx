@@ -810,7 +810,7 @@ function Pricing() {
               </ul>
 
               <Link
-                href={`/checkout?plan=${plan.name.toLowerCase()}`}
+                href={`https://app.datascout.com.br/checkout?plan=${plan.name.toLowerCase()}`}
                 className={`block text-center font-bold py-4 transition-all ${
                   plan.highlight
                     ? "bg-[#00C853] hover:bg-[#00E676] text-black hover:scale-105"
